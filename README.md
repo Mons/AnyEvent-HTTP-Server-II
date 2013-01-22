@@ -31,35 +31,44 @@ All files are located under benchmaks/
 * AnyEvent::HTTP::Server-II (1 worker)
 
 	finished in 1 sec, 295 millisec and 127 microsec, **7721** req/s, 912 kbyte/s
+	
 
-* AnyEvent::HTTP::Server-II (**4** workers)
+* AnyEvent::HTTP::Server-II ( **4** workers)
 
 	finished in 0 sec, 552 millisec and 381 microsec, **18103** req/s, 2139 kbyte/s
+	
 
 * AnyEvent::HTTP::Server (previous)
 
 	finished in 3 sec, 421 millisec and 143 microsec, **2922** req/s, 278 kbyte/s
+	
 
 * AnyEvent::HTTPD (v0.93t)
 
 	finished in 18 sec, 622 millisec and 941 microsec, **536** req/s, 99 kbyte/s
+	
 
 * Twiggy (v0.1021)
 
 	finished in 1 sec, 630 millisec and 908 microsec, **6131** req/s, 272 kbyte/s
+	
 
 * Starman (--workers 1) (v0.3006)
 
 	finished in 2 sec, 469 millisec and 571 microsec, **4049** req/s, 511 kbyte/s
+	
 
 * Starman (--workers **4**) (best for my 4 core)
 
 	finished in 1 sec, 102 millisec and 631 microsec, **9069** req/s, 1161 kbyte/s
+	
 
 * Pyton Twisted (I'm not a python programmer, so code may be not efficient)
 
 	finished in 4 sec, 122 millisec and 587 microsec, **2425** req/s, 355 kbyte/s
+	
 
 * Node.js
 
-	finished in 1 sec, 766 millisec and 696 microsec, *5660* req/s, 790 kbyte/s
+	finished in 1 sec, 766 millisec and 696 microsec, **5660** req/s, 790 kbyte/s
+	

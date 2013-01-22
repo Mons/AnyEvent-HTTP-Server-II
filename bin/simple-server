@@ -1,7 +1,8 @@
 #!/usr/bin/env perl
 
 use strict;
-use lib::abs '../blib/lib';
+use FindBin;
+use lib "$FindBin::Bin/../blib/lib";
 use Sys::Hostname;
 use Getopt::Long;
 use Cwd 'cwd','abs_path';

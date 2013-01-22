@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 
 use strict;
-use lib::abs '../blib/lib', '..';
+#use lib::abs '../blib/lib', '..';
 use t::testlib;
 use AnyEvent::HTTP::Server::Kit;
 

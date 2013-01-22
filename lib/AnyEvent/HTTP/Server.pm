@@ -68,7 +68,7 @@ use Encode ();
 use Compress::Zlib ();
 use MIME::Base64 ();
 
-use Carp 'croak';
+#use Carp 'croak';
 
 use AnyEvent::HTTP::Server::Req;
 

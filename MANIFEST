@@ -8,7 +8,6 @@ benchmarks/starman.sh
 benchmarks/twiggy.sh
 benchmarks/twisted.py
 bin/simple-server
-bin/simple_server
 Changes
 Kit.pm.PL
 lib/AnyEvent/HTTP/Server.pm
@@ -17,8 +16,6 @@ LICENSE
 Makefile.PL
 MANIFEST
 MANIFEST.SKIP
-MYMETA.json
-MYMETA.yml
 README
 README.md
 t/00-load.t
