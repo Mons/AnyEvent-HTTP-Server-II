@@ -1,0 +1,55 @@
+NAME
+    AnyEvent::HTTP::Server - AnyEvent HTTP/1.1 Server
+
+SYNOPSIS
+        use AnyEvent::HTTP::Server;
+        my $s = AnyEvent::HTTP::Server->new(
+        host => '0.0.0.0',
+        port => 80,
+        cb   => sub {
+            my $req = shift;
+            return sub {
+            my ($is_last, $bodypart) = @_;
+            $r->reply(200, "<h1>Reply message</h1>", headers => { 'content-type' => 'text/html' });
+            }
+        }
+        );
+        $s->listen;
+
+        ## you may also prefork on N cores:
+
+        # fork() ? next : last for (1..$N-1);
+
+        ## Of course this is very simple example
+        ## don't use such prefork in production
+
+        $s->accept;
+
+        my $sig = AE::signal INT => sub {
+        warn "Stopping server";
+        $s->graceful(sub {
+            warn "Server stopped";
+            EV::unloop;
+        });
+        };
+
+        EV::loop;
+
+RESOURCES
+    *   GitHub repository
+
+        <http://github.com/Mons/AnyEvent-HTTP-Server>
+
+ACKNOWLEDGEMENTS
+    *   Thanks to Marc Lehmann for AnyEvent
+
+    *   Thanks to Robin Redeker for AnyEvent::HTTPD
+
+AUTHOR
+    Mons Anderson, <mons@cpan.org>
+
+LICENSE
+    This program is free software; you can redistribute it and/or modify it
+    under the terms of either: the GNU General Public License as published
+    by the Free Software Foundation; or the Artistic License.
+

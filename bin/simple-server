@@ -1,0 +1,149 @@
+#!/usr/bin/env perl
+
+use strict;
+use lib::abs '../blib/lib';
+use Sys::Hostname;
+use Getopt::Long;
+use Cwd 'cwd','abs_path';
+use POSIX 'strftime';
+use AnyEvent::HTTP::Server 0.02;
+use File::Spec;
+use EV;
+BEGIN {
+	if( eval { require File::MimeInfo; 1 } ) {
+		File::MimeInfo->import('mimetype');
+	} else {
+		*mimetype = sub { 'application/octet-stream' };
+	}
+}
+
+my $host = hostname();
+
+GetOptions(
+	'p|port=s'   => \( my $port = 3080 ),
+	'l|listen=s' => \( my $addr = 0 ),
+);
+
+my $path = abs_path(shift) // cwd();
+
+warn "Serving $host ($addr:$port) ($path)\n";
+
+my $s = AnyEvent::HTTP::Server->new(
+	host => $addr,
+	port => $port,
+	cb => sub {
+		my $r = shift;
+		my $dironly = substr( $r->path, -1,1 ) eq '/';
+		my $p = File::Spec->canonpath( $r->path || '/' );
+		
+		$p =~ s{\./}{}sg;
+		$p =~ s{/+$}{}s;
+		1 while $p =~ s{\.\./[^/]+}{}sg;
+		1 while $p =~ s{\.\./}{}sg;
+		my $rel = File::Spec->canonpath( $p );
+		$p = $path.'/'.$p;
+		$p =~ s{/+}{/}sg;
+		$p = File::Spec->canonpath( $p );
+		my $type = "X";
+		my $status = 404;
+		my $mime;
+		if (-d $p) {
+			if (-f "$p/index.html") { $p = "$p/index.html"; $dironly = 0; }
+			elsif (-f "$p/index.htm") { $p = "$p/index.htm"; $dironly = 0; }
+		}
+		if (-d $p) {
+			$type = "D";
+			my $content = dirindex($p, $rel);
+			$r->reply($status = 200, $content, headers => { 'content-type' => 'text/html' });
+		}
+		elsif (-e $p) {
+			$type = -f _ ? "F" : "Z";
+			if ($dironly) {
+				$r->go($rel);
+				$status = 302;
+				$type .= "/";
+				$mime = "-> $rel";
+			} else {
+				$mime = mimetype( $p );
+				$r->sendfile($status = 200, $p, headers => { 'content-disposition' => 'inline', 'content-type' => $mime });
+			}
+		}
+		printf STDERR  "[%s] %-2s %-3s %s %s -> %s : (%s)\n",
+			strftime("%b %d %H:%M:%S", localtime()),
+			$type, $status,
+			$r->method,
+			$r->path, $p,
+			$mime
+		;
+		return if $type eq 'X';
+		return;
+	},
+);
+my ($h,$p) = $s->listen;
+$s->accept;
+warn "Started at http://$h:$p";
+
+EV::loop;();
+
+sub e($) {
+	local $_ = shift;
+	s{&}{&amp;}sg;
+	s{<}{&lt;}sg;
+	s{>}{&gt;}sg;
+	s{"}{&quot;}sg; # "
+	s{'}{&apos;}sg; # '
+	$_;
+}
+
+sub sz($) {
+	my $size = shift;
+	my @sizes = qw( b K M G T );
+	while ($size > 1024 and @sizes > 1) {
+		$size /= 1024;
+		shift @sizes;
+	}
+	return  sprintf +(int($size) == $size ? '%d%s' : '%0.1f%s'), $size, $sizes[0];
+}
+
+
+sub dirindex($$) {
+	my ($real,$web) = @_;
+	my $body = sprintf q{<h1>Directory index for <code>%s/</code> (<small><code>%s/</code></small>)</h1><table width="100%%" style="table-layout:fixed">}, e $web, e $real;
+	opendir(my $d, $real) or die "$!";
+	my (@dots, @dirs, @files);
+	while (defined( $_ = readdir($d) )) {
+		next if $web eq '' and /^\.\.?$/;
+		if (-d $_ and !/^\.\.?$/) {
+			push @dirs, $_;
+		}
+		elsif( /^\.\.?$/ ) {
+			push @dots, $_ if $web ne '';
+		}
+		else {
+			push @files, $_;
+		}
+	}
+	@dirs = sort { lc($a) cmp lc ($b) } @dirs;
+	@files = sort { lc($a) cmp lc ($b) } @files;
+	for (@dots, @dirs, @files) {
+		next if $web eq '' and /^\.\.?$/;
+		my $fx = $real.'/'.$_;
+		$body .= '<tr>';
+		my ($stat, $date);
+		if (-f $fx) {
+			my @stat = stat _;
+			$stat = sz($stat[7]);
+			$date = strftime("%Y-%m-%d %H:%M:%S",localtime($stat[9]));
+		} else {
+		}
+		$body .= sprintf
+			q{<tr><td width="80%%"><a href="%s">%s</a></td><td>%s</td><td>%s</td></tr>},
+			e +File::Spec->canonpath( $web.'/'.$_ ),
+			e $_.(-d $fx ? "/" : ''), 
+			$stat,
+			$date,
+		;	
+	}
+	$body .= "</table>";
+	return $body;
+}

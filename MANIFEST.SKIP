@@ -1,0 +1,37 @@
+# Avoid version control files.
+\B\.git(?:ignore|)\b
+
+# Avoid Makemaker generated and utility files.
+\bMANIFEST\.bak
+\bMakefile$
+\bblib/
+\bMakeMaker-\d
+\bpm_to_blib\.ts$
+\bpm_to_blib$
+\bblibdirs\.ts$         # 6.18 through 6.25 generated this
+
+# Avoid Module::Build generated and utility files.
+\bBuild$
+\b_build/
+
+# Avoid temp and backup files.
+~$
+\.old$
+\#$
+\b\.#
+\.bak$
+\.rpm$
+
+# Avoid Devel::Cover files.
+\bcover_db\b
+
+# Avoid local testing/dist files
+
+^dist/
+^makeall\.sh$
+^tmp/
+^AnyEvent-HTTP-Server-.*
+Kit\.pm$
+^xt/
+^ex/
+^topdir-

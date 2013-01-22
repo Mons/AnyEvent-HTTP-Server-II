@@ -1,0 +1,15 @@
+Revision history for AnyEvent-HTTP-Server
+
+TODO: more tests ;)
+TODO: more work on keepalive
+TODO: chunked requests
+TODO: WebSockets
+TODO: Dispatchers
+TODO: XS Enhancements
+
+1.95    Jan 22 2013
+        Complete rewrite ;)
+
+0.01    May 2 2010
+        First version, released on an unsuspecting world.
+
