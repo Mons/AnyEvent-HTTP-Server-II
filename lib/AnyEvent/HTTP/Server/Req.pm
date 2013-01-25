@@ -33,6 +33,7 @@ use AnyEvent::HTTP::Server::Kit;
 		sub connection { $_[0][2]{connection} =~ /^([^;]+)/ && lc( $1 ) }
 		
 		sub method  { $_[0][0] }
+		sub full_uri { 'http://' . $_[0][2]{host} . $_[0][1] }
 		sub uri     { $_[0][1] }
 		sub headers { $_[0][2] }
 		

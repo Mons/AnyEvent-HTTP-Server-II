@@ -3,6 +3,7 @@ inc*
 MYMETA*
 Makefile
 Makefile.old
+MANIFEST.bak
 Build
 Build.bat
 _build*
