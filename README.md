@@ -77,10 +77,10 @@ All files are located under benchmaks/
 
 		location / { perl 'use nginx; sub { $_[0]->send_http_header(q{text/plain}); $_[0]->print(q{Good}); return OK; }'; }
 	
-	finished in 0 sec, 290 millisec and 380 microsec, 34437 req/s, 5515 kbyte/s
+	finished in 0 sec, 290 millisec and 380 microsec, **34437** req/s, 5515 kbyte/s
 
 * Raw TCP/HTTP server (perl+ev with no logic or parsing)
 
 		For source look into benchmarks/ev-raw.pl
 	
-	finished in 0 sec, 306 millisec and 259 microsec, 32652 req/s, 2678 kbyte/s
+	finished in 0 sec, 306 millisec and 259 microsec, **32652** req/s, 2678 kbyte/s
