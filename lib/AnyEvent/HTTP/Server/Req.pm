@@ -232,15 +232,16 @@ use AnyEvent::HTTP::Server::Kit;
 
 Let client know if an error occured by dropping connection before sending complete data
 
-BUGS: it does not work as expected :-)
+KNOWN ISSUES: nginx, when used as a reverse proxy, masks connection abort, leaving no 
+ability for browser to detect error condition.
 
 =cut
 		sub abort {
 			my $self = shift;
 			$self->[4] or die "Need to be chunked reply";
 			if( $self->[3] ) {
-				$self->[3]->( \("1$LF")  );
-				$self->[3]->( \undef) if $self->connection eq 'close' or $self->[SERVER]{graceful};
+				$self->[3]->( \("1$LF"));
+				$self->[3]->( \undef);
 				delete $self->[3];
 				${ $self->[REQCOUNT] }--;
 			}
