@@ -1,4 +1,21 @@
+package AnyEvent::HTTP::Server::Form;
+
+
+
 package AnyEvent::HTTP::Server::Req;
+{
+package #hide
+	aehts::sv;
+use overload
+	'""' => sub { ${$_[0]} },
+	'@{}' => sub { [${$_[0]}] },
+	fallback => 1;
+package #hide
+	aehts::av;
+use overload
+	'""' => sub { $_[0][0] },
+	fallback => 1;
+}
 
 use AnyEvent::HTTP::Server::Kit;
 	
@@ -7,6 +24,8 @@ use AnyEvent::HTTP::Server::Kit;
 	our %hdr; @hdr{@hdr} = @hdrn;
 	our %hdri; @hdri{ @hdr } = 0..$#hdr;
 	our $LF = "\015\012";
+	our $JSON;
+	our $JSONP;
 	our %http = do {
 		local ($a,$b);
 		my @w = qw(Content Entity Error Failed Found Gateway Large Proxy Request Required Timeout);
@@ -47,7 +66,22 @@ use AnyEvent::HTTP::Server::Kit;
 		}
 		
 		sub form {
-			my $h = +{ map { my ($k,$v) = split /=/,$_,2; +( url_unescape($k) => url_unescape($v) ) } split /&/, $_[1] };
+			my %h;
+			while ( $_[1] =~ m{ \G ([^=]+) = ([^&]*) ( & | \Z ) }gcxso ) {
+				my $k = url_unescape($1);
+				my $v = bless do{\(my $o = url_unescape($2))}, 'aehts::sv';
+				if (exists $h{$k}) {
+					if (UNIVERSAL::isa($h{$k}, 'ARRAY')) {
+						push @{$h{$k}},$v;
+					} else {
+						$h{$k} = bless [ $h{$k},$v ], 'aehts::av';
+					}
+				}
+				else {
+					$h{$k} = $v;
+				}
+			}
+			return \%h;
 		}
 		
 		sub uri_parse {
@@ -79,6 +113,38 @@ use AnyEvent::HTTP::Server::Kit;
 			} else {
 				return keys %{ $_[0][6] };
 			}
+		}
+		
+		sub replyjs {
+			my $self = shift;
+			warn "Replyjs: @_ by @{[ (caller)[1,2] ]}";
+			my ($code,$data,%args);
+			$code = ref $_[0] ? 200 : shift;
+			$data = shift;
+			%args = @_;
+			$args{headers} ||= {};
+			$args{headers}{'content-type'} ||= 'application/json';
+			my $pretty = delete $args{pretty};
+			$JSON or do {
+				eval { require JSON::XS;1 }
+					or do {
+						warn "replyjs required JSON::XS, which could not be loaded: $@. Called from @{[ (caller)[1,2] ]}\n";
+						$self->reply(500,'{error: "Internal Server Error" }', %args);
+						return;
+					};
+				$JSON  = JSON::XS->new->utf8;
+				$JSONP = JSON::XS->new->utf8->pretty;
+			};
+			my $jdata = eval {
+				($pretty ? $JSONP : $JSON)->encode( $data );
+			};
+			defined $jdata or do {
+				warn "Can't encode to JSON: $@ at @{[ (caller)[1,2] ]}\n";
+				$self->reply(500,'{error: "Internal Server Error"}', %args);
+				return;
+			};
+			$self->reply( $code, $jdata, %args );
+			
 		}
 		
 		sub sendfile {
@@ -230,7 +296,7 @@ use AnyEvent::HTTP::Server::Kit;
 		
 		sub DESTROY {
 			my $self = shift;
-			#warn "Destroy req by @{[ (caller)[1,2] ]}";
+			#warn "Destroy req $self->[0] $self->[1] by @{[ (caller)[1,2] ]}";
 			if( $self->[3] ) {
 				if ($self->[4]) {
 					$self->body(" response truncated");
