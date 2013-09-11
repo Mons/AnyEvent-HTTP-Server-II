@@ -276,7 +276,7 @@ sub incoming {
 							return; # need more
 						}
 				}
-				my %h;
+				my %h = ( INTERNAL_REQUEST_ID => $id);
 				if ($state == 1) {
 					# headers
 					pos($buf) = $pos;
