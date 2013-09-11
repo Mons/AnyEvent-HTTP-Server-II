@@ -293,6 +293,25 @@ use AnyEvent::HTTP::Server::Kit;
 				${ $self->[REQCOUNT] }--;
 			}
 		}
+
+=head2 abort  - drop chunked connection
+
+Let client know if an error occured by dropping connection before sending complete data
+
+KNOWN ISSUES: nginx, when used as a reverse proxy, masks connection abort, leaving no 
+ability for browser to detect error condition.
+
+=cut
+		sub abort {
+			my $self = shift;
+			$self->[4] or die "Need to be chunked reply";
+			if( $self->[3] ) {
+				$self->[3]->( \("1$LF"));
+				$self->[3]->( \undef);
+				delete $self->[3];
+				${ $self->[REQCOUNT] }--;
+			}
+		}
 		
 		sub DESTROY {
 			my $self = shift;
@@ -300,7 +319,7 @@ use AnyEvent::HTTP::Server::Kit;
 			if( $self->[3] ) {
 				if ($self->[4]) {
 					$self->body(" response truncated");
-					$self->finish();
+					$self->abort();
 				} else {
 					$self->reply( 404, "Request not handled\n$self->[0] $self->[1]\n", headers => { 'content-type' => 'text/plain' } );
 					#$self->[3]->(\("HTTP/1.0 404 Not Found\nConnection:close\nContent-type:text/plain\n\nRequest not handled\n"));
