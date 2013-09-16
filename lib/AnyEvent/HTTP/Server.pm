@@ -184,6 +184,11 @@ sub accept:method {
 	return;
 }
 
+sub noaccept {
+	my $self = shift;
+	delete $self->{aw};
+}
+
 sub drop {
 	my ($self,$id,$err) = @_;
 	$err =~ s/\015//sg;
