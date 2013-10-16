@@ -6,7 +6,7 @@ AnyEvent::HTTP::Server - AnyEvent HTTP/1.1 Server
 
 =cut
 
-our $VERSION = '1.96';
+our $VERSION = '1.97';
 
 =head1 SYNOPSIS
 
@@ -175,10 +175,12 @@ sub accept:method {
 	$self->{aw} = AE::io $self->{fh}, 0, sub {
 		while ($self->{fh} and (my $peer = accept my $fh, $self->{fh})) {
 			AnyEvent::Util::fh_nonblocking $fh, 1; # POSIX requires inheritance, the outside world does not
-			#my ($service, $host) = AnyEvent::Socket::unpack_sockaddr $peer;
-			setsockopt($fh, IPPROTO_TCP, TCP_NODELAY, 1) or die "setsockopt(TCP_NODELAY) failed:$!";
-			#$self->incoming($fh, AnyEvent::Socket::format_address $host, $service);
-			$self->incoming($fh);
+			if ($self->{want_peer}) {
+				my ($service, $host) = AnyEvent::Socket::unpack_sockaddr $peer;
+				$self->incoming($fh, AnyEvent::Socket::format_address $host, $service);
+			} else {
+				$self->incoming($fh);
+			}
 		}
 	};
 	return;
@@ -205,7 +207,7 @@ sub incoming {
 	weaken( my $self = shift );
 	#warn "incoming @_";
 	$self->{total_connections}++;
-		my ($fh) = @_;
+		my ($fh,$rhost,$rport) = @_;
 		my $id = ++$self->{seq}; #refaddr $fh;
 		
 		my %r = ( fh => $fh, id => $id );
@@ -281,7 +283,7 @@ sub incoming {
 							return; # need more
 						}
 				}
-				my %h = ( INTERNAL_REQUEST_ID => $id);
+				my %h = ( INTERNAL_REQUEST_ID => $id, defined $rhost ? ( Remote => $rhost, RemotePort => $rport ) : () );
 				if ($state == 1) {
 					# headers
 					pos($buf) = $pos;
