@@ -1,6 +1,16 @@
 package AnyEvent::HTTP::Server::Form;
 
+=head1 NAME
 
+AnyEvent::HTTP::Server::Req - Request object used by AnyEvent::HTTP::Server
+
+=head1 VERSION
+
+Version 1.97
+
+=cut
+
+our $VERSION = '1.97';
 
 package AnyEvent::HTTP::Server::Req;
 {
@@ -294,14 +304,6 @@ use AnyEvent::HTTP::Server::Kit;
 			}
 		}
 
-=head2 abort  - drop chunked connection
-
-Let client know if an error occured by dropping connection before sending complete data
-
-KNOWN ISSUES: nginx, when used as a reverse proxy, masks connection abort, leaving no 
-ability for browser to detect error condition.
-
-=cut
 		sub abort {
 			my $self = shift;
 			$self->[4] or die "Need to be chunked reply";
@@ -327,3 +329,161 @@ ability for browser to detect error condition.
 			}
 			@$self = ();
 		}
+
+
+
+1;
+
+__END__
+
+
+=head1 SYNOPSIS
+
+    sub dispatch {
+      my $request = shift;
+      if ($request->path =~ m{ ^ /ping /? $}x) {
+        $request->reply( 200, 'pong', headers=> { 'Content-Type' => 'text/plain'});
+      } else {
+        $request->reply( 404, 'Not found', headers=> { 'Content-Type' => 'text/plain'});
+      }
+    }
+
+=head1 DESCRIPTION
+
+  This module is a part of AnyEvent::HTTP::Server, see perldoc AnyEvent::HTTP::Server for details
+
+=head1 EXPORT
+
+  Does not export anything
+
+=head1 SUBROUTINES/METHODS
+
+=head2 connection  - 'Connection' header
+
+  return Connection header from client request
+
+=head2 method  - request method
+
+  return HTTP Method been used in request, such as GET, PUT, HEAD, POST, etc..
+
+=head2 full_uri  - URI with host part
+
+  Requested uri with host and protocol name. Protocol part is always http://
+
+=head2 uri  - URI aith host part stripped from it
+
+  Requested uri without host and protocol name
+
+=head2 headers - Headers from client request
+
+  Return value is a hash reference. All header names are lowercased.
+
+=head2 go($location) - Send redirect
+
+  Redirect client to $location with 302 HTTP Status code.
+
+=head2 reply($status,$content, $headers) - Send reply to client
+
+  This method sends both headers and response body to client, and should be called at the end of
+  request processing.
+
+  Parameters:
+
+=head3 status
+    
+    HTTP Status header (200 is OK, 403 is Auth required and so on).
+
+=head3 content
+    
+    Response body as a scalar.
+
+=head3 headers
+    
+    Response headers as a hash reference.
+
+=head2 replyjs( [code], $data, %arguments ) - Send reply in JSON format
+
+=head3 code
+    
+    Optional Status code, 200 is default.
+
+=head3 data
+    
+    Response data to encode with JSON. All strings will be encoded as  UTF-8.
+
+=head3 arguments
+    
+    List of key=> value arguments. The only supported argument for a moment is
+    pretty => 1 | 0. JSON data will be formated for easier reading by human, 
+    if pretty is true.
+
+=head2 send_headers($code, @argumnets_list )  - send response headers to client
+
+    This method may be used in conjunction with body() and finish() methods
+    for streaming content serving. Response header 'transfer-encoding' is set 
+    to 'chunked' by this method.
+
+=head3 code
+    
+    HTTP Status code to send to a client.
+
+=head3 arguments_list
+    
+    The rest of arguments is interpreted as a key=>value list. One should pass
+    headers key, for example
+
+    $request->send_headers(200, headers => { 'Content-type' => 'text/plain'} );
+
+    Subsequent data should be send with body method, and after all data sent, finish 
+    request handling with finish() method. Methods send_headers, body and finish 
+    should be always used together.
+
+=head2 body($data )  - send chunk of data to client
+
+    Sends part ( or chunk ) of data to client
+
+=head2 finish  - finish chunked request processing
+
+    Finishes request by sending zero-length chunk to client.
+
+=head2 abort  - drop chunked connection
+
+  Let client know if an error occured by dropping connection before sending complete data
+
+  KNOWN ISSUES: nginx, when used as a reverse proxy, masks connection abort, leaving no 
+  ability for browser to detect error condition.
+
+=cut
+
+
+=head1 RESOURCES
+
+=over 4
+
+=item * GitHub repository
+
+L<http://github.com/Mons/AnyEvent-HTTP-Server-II>
+
+=back
+
+=head1 ACKNOWLEDGEMENTS
+
+=over 4
+
+=item * Thanks to B<Marc Lehmann> for L<AnyEvent>
+
+=item * Thanks to B<Robin Redeker> for L<AnyEvent::HTTPD>
+
+=back
+
+=head1 AUTHOR
+
+Mons Anderson, <mons@cpan.org>
+
+=head1 LICENSE
+
+This program is free software; you can redistribute it and/or modify it
+under the terms of either: the GNU General Public License as published
+by the Free Software Foundation; or the Artistic License.
+
+=cut
