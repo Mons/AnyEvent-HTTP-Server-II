@@ -600,7 +600,7 @@ sub graceful {
 
 =item * GitHub repository
 
-L<http://github.com/Mons/AnyEvent-HTTP-Server>
+L<http://github.com/Mons/AnyEvent-HTTP-Server-II>
 
 =back
 
