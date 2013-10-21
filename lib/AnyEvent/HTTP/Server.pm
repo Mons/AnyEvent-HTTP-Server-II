@@ -655,7 +655,53 @@ One can easily implement own HTTP daemon with AnyEvent::HTTP::Server and Daemond
 both found at L<https://github.com/Mons>
 
 This is a second verson available as AnyEvent-HTTP-Server-II. The first version is now obsolette.
- 
+
+=head1 HANDLING REQUEST
+
+You can handle HTTP request by passing cb parameter to AnyEvent::HTTP::Server->new() like this:
+
+
+  my $dispatcher = sub {
+    my $request = shift;
+    #... Request processing code goes here ...
+    1;
+  };
+
+  my $s = AnyEvent::HTTP::Server->new( host => '0.0.0.0', port => 80, cb => $dispatcher,);
+
+$dispatcher coderef will be called in a list context and it's return value should resolve 
+to true, or request processing will be aborted by AnyEvent:HTTP::Server.
+
+One able to process POST requests by returning specially crafted  hash reference from cb 
+parameter coderef ($dispatcher in out example). This hash must contain the B<form> key, 
+holding a code reference. If B<conetnt-encoding> header is 
+B<application/x-www-form-urlencoded>, form callback will be called.
+
+  my $post_action = sub {
+    my ( $request, $form ) = @_;
+    $request->reply(
+      200, # HTTP Status
+      "You just send long_data_param_name value of $form->{long_data_param_name}",  # Content
+      headers=> { 'content-type' =< 'text/plain'}, # Response headers
+    );
+  }
+
+  my $dispatcher = sub {
+    my $request = shift;
+
+    if ( $request->headers->{'content-type'} =~ m{^application/x-www-form-urlencoded\s*$} ) {
+      return {
+        form => sub {
+          $cb->( $request, $post_action);
+        },
+      };
+    } else {
+      # GET request processing
+    } 
+
+  };
+
+  my $s = AnyEvent::HTTP::Server->new( host => '0.0.0.0', port => 80, cb => $dispatcher,);
 
 =head1 EXPORT
 
