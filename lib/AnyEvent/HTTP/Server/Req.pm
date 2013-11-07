@@ -200,7 +200,7 @@ use AnyEvent::HTTP::Server::Kit;
 		
 		sub reply {
 			my $self = shift;
-			return $self->headers(@_) if @_ % 2;
+			#return $self->headers(@_) if @_ % 2;
 			my ($code,$content,%args) = @_;
 			$code ||=200;
 			#if (ref $content) {

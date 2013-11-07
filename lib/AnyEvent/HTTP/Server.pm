@@ -6,7 +6,7 @@ AnyEvent::HTTP::Server - AnyEvent HTTP/1.1 Server
 
 =cut
 
-our $VERSION = '1.97';
+our $VERSION = '1.98';
 
 =head1 SYNOPSIS
 
@@ -530,7 +530,7 @@ sub incoming {
 							#elsif (chunked) { TODO }
 							else {
 								#warn "No clen";
-								$r{on_body}(1) if $r{on_body};
+								$r{on_body}(1,\('')) if $r{on_body};
 								# FINISHED
 								#warn "3. finished request" . Dumper($req);
 								#warn "pos = $pos, lbuf=".length $buf;
