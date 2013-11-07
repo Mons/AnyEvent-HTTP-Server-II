@@ -117,7 +117,7 @@ use AnyEvent::HTTP::Server::Kit;
 		
 		sub replyjs {
 			my $self = shift;
-			warn "Replyjs: @_ by @{[ (caller)[1,2] ]}";
+			#warn "Replyjs: @_ by @{[ (caller)[1,2] ]}";
 			my ($code,$data,%args);
 			$code = ref $_[0] ? 200 : shift;
 			$data = shift;
