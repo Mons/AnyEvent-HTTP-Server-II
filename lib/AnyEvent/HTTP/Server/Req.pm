@@ -227,10 +227,10 @@ use AnyEvent::HTTP::Server::Kit;
 			if (exists $h->{'content-type'}) {
 				if( $h->{'content-type'} !~ m{[^;]+;\s*charset\s*=}
 				and $h->{'content-type'} =~ m{(?:^(?:text/|application/(?:json|(?:x-)?javascript))|\+(?:json|xml)\b)}i) {
-					$h->{'content-type'} .= '; charset=UTF-8';
+					$h->{'content-type'} .= '; charset=utf-8';
 				}
 			} else {
-				$h->{'content-type'} = 'text/html; charset=UTF-8';
+				$h->{'content-type'} = 'text/html; charset=utf-8';
 			}
 			for (keys %$h) {
 				if (exists $hdr{lc $_}) { $good[ $hdri{lc $_} ] = $hdr{ lc $_ }.": ".$h->{$_}.$LF; }

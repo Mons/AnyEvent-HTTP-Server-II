@@ -365,11 +365,13 @@ sub incoming {
 								my @rv = $self->{cb}->( $req = bless [ $method, $uri, \%h, $write, undef,undef,undef, \$self->{active_requests}, $self ], 'AnyEvent::HTTP::Server::Req' );
 								weaken( $req->[8] );
 								#my @rv = $self->{cb}->( $req = bless [ $method, $uri, \%h, $write ], 'AnyEvent::HTTP::Server::Req' );
+warn "HH ".Data::Dumper::Dumper( \%h );
 								if (@rv) {
 									if (ref $rv[0] eq 'CODE') {
 										$r{on_body} = $rv[0];
 									}
 									elsif ( ref $rv[0] eq 'HASH' ) {
+warn "POST DBG ".Data::Dumper::Dumper( \@rv );
 										if ( $h{'content-type'}  =~ m{^
 												multipart/form-data\s*;\s*
 												boundary\s*=\s*
@@ -463,14 +465,16 @@ sub incoming {
 												#}
 											};
 										}
-										elsif ( $h{'content-type'} =~ m{^application/x-www-form-urlencoded(?:\Z|\s*;)}i and exists $rv[0]{form} ) {
+#										elsif ( $h{'content-type'} =~ m{^application/x-www-form-urlencoded(?:\Z|\s*;)}i and exists $rv[0]{form} ) {
+
+										elsif (  exists $rv[0]{form} ) {
 											my $body = '';
 											$r{on_body} = sub {
 												my ($last,$part) = @_;
-												if ( length($body) + length($$part) > $self->{max_body_size} ) {
+												if ( length($body) + length($part) > $self->{max_body_size} ) {
 													# TODO;
 												}
-												$body .= $$part;
+												$body .= $part;
 												if ($last) {
 													$rv[0]{form}( $req->form($body), \$body );
 													delete $r{on_body};
