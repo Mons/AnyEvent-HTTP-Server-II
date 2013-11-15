@@ -117,7 +117,7 @@ use AnyEvent::HTTP::Server::Kit;
 		
 		sub replyjs {
 			my $self = shift;
-			warn "Replyjs: @_ by @{[ (caller)[1,2] ]}";
+			#warn "Replyjs: @_ by @{[ (caller)[1,2] ]}";
 			my ($code,$data,%args);
 			$code = ref $_[0] ? 200 : shift;
 			$data = shift;
@@ -200,7 +200,7 @@ use AnyEvent::HTTP::Server::Kit;
 		
 		sub reply {
 			my $self = shift;
-			return $self->headers(@_) if @_ % 2;
+			#return $self->headers(@_) if @_ % 2;
 			my ($code,$content,%args) = @_;
 			$code ||=200;
 			#if (ref $content) {
