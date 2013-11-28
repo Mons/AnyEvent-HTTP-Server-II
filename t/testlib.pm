@@ -60,7 +60,9 @@ sub read_response {
 											} );
 										} else {
 											#warn dumper \@chunks;
-											$cb->(\%h,@chunks);
+											$h->push_read( chunk => 2, sub {
+												$cb->(\%h,@chunks);
+											});
 										}
 									});
 								};
