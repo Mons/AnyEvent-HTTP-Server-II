@@ -6,7 +6,7 @@ AnyEvent::HTTP::Server - AnyEvent HTTP/1.1 Server
 
 =cut
 
-our $VERSION = '1.98';
+our $VERSION = '1.981';
 
 =head1 SYNOPSIS
 
@@ -201,6 +201,14 @@ sub drop {
 	
 	( delete $self->{graceful} )->()
 		if $self->{graceful} and $self->{active_requests} == 0;
+}
+
+sub req_wbuf_len {
+	my $self = shift;
+	my $req = shift;
+	return undef unless exists $self->{ $req->headers->{INTERNAL_REQUEST_ID} };
+	return 0 unless exists $self->{ $req->headers->{INTERNAL_REQUEST_ID} }{wbuf};
+	return length ${ $self->{ $req->headers->{INTERNAL_REQUEST_ID} }{wbuf} };
 }
 
 sub incoming {

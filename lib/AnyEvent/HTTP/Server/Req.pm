@@ -250,7 +250,7 @@ use AnyEvent::HTTP::Server::Kit;
 		sub send_headers {
 			my ($self,$code,%args) = @_;
 			$code ||= 200;
-			my $reply = "HTTP/1.0 $code $http{$code}$LF";
+			my $reply = "HTTP/1.1 $code $http{$code}$LF";
 			my @good;my @bad;
 			my $h = {
 				%{ $args{headers} || {} },
@@ -278,16 +278,16 @@ use AnyEvent::HTTP::Server::Kit;
 			my $content = shift;
 			utf8::encode $content if utf8::is_utf8 $content;
 			my $length = sprintf "%x", length $content;
-			#warn "send body part $length\n$content\n";
+			#warn "send body part $length / ".length($content)."\n";
 			$self->[3]->( \("$length$LF$content$LF") );
 		}
 		
 		sub finish {
 			my $self = shift;
 			$self->[4] or die "Need to be chunked reply";
-			#warn "send body end\n";
+			#warn "send body end (".$self->connection.")\n";
 			if( $self->[3] ) {
-				$self->[3]->( \("0$LF")  );
+				$self->[3]->( \("0$LF$LF")  );
 				$self->[3]->(\undef) if $self->connection eq 'close' or $self->[SERVER]{graceful};
 				delete $self->[3];
 				${ $self->[REQCOUNT] }--;
