@@ -3,6 +3,7 @@
 
 # Avoid Makemaker generated and utility files.
 \bMANIFEST\.bak
+^MYMETA\.
 \bMakefile$
 \bblib/
 \bMakeMaker-\d
@@ -35,3 +36,5 @@ Kit\.pm$
 ^xt/
 ^ex/
 ^topdir-
+^benchmarks/mojo
+^benchmarks/nginx-
