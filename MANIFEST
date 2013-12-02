@@ -1,6 +1,7 @@
 benchmarks/anyevent-http-server-multicore.pl
 benchmarks/anyevent-http-server.pl
 benchmarks/anyevent-httpd.pl
+benchmarks/ev-raw.pl
 benchmarks/node.js
 benchmarks/psgi.pl
 benchmarks/starman-multicore.sh
