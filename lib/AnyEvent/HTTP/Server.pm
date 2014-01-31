@@ -373,7 +373,7 @@ sub incoming {
 								my @rv = $self->{cb}->( $req = bless [ $method, $uri, \%h, $write, undef,undef,undef, \$self->{active_requests}, $self ], 'AnyEvent::HTTP::Server::Req' );
 								weaken( $req->[8] );
 								#my @rv = $self->{cb}->( $req = bless [ $method, $uri, \%h, $write ], 'AnyEvent::HTTP::Server::Req' );
-								if (@rv) {
+                                				if (@rv) {
 									if (ref $rv[0] eq 'CODE') {
 										$r{on_body} = $rv[0];
 									}
@@ -471,7 +471,9 @@ sub incoming {
 												#}
 											};
 										}
-										elsif ( $h{'content-type'} =~ m{^application/x-www-form-urlencoded(?:\Z|\s*;)}i and exists $rv[0]{form} ) {
+#										elsif ( $h{'content-type'} =~ m{^application/x-www-form-urlencoded(?:\Z|\s*;)}i and exists $rv[0]{form} ) {
+
+										elsif (  exists $rv[0]{form} ) {
 											my $body = '';
 											$r{on_body} = sub {
 												my ($last,$part) = @_;
@@ -480,7 +482,7 @@ sub incoming {
 												}
 												$body .= $$part;
 												if ($last) {
-													$rv[0]{form}( $req->form($body), \$body );
+													$rv[0]{form}( $req->form($body), $body );
 													delete $r{on_body};
 												}
 											};
