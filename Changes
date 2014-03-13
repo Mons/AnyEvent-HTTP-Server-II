@@ -6,6 +6,7 @@ TODO: chunked requests
 TODO: WebSockets
 TODO: Dispatchers
 TODO: XS Enhancements
+TODO: send reply with content length and send body in chunks
 
 1.95    Jan 22 2013
         Complete rewrite ;)
