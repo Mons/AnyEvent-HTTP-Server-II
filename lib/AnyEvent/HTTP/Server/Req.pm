@@ -125,6 +125,7 @@ use AnyEvent::HTTP::Server::Kit;
 			$args{headers} ||= {};
 			$args{headers}{'content-type'} ||= 'application/json';
 			my $pretty = delete $args{pretty};
+			my $calback_name = delete $args{jsonp_callback};
 			$JSON or do {
 				eval { require JSON::XS;1 }
 					or do {
@@ -143,6 +144,7 @@ use AnyEvent::HTTP::Server::Kit;
 				$self->reply(500,'{error: "Internal Server Error"}', %args);
 				return;
 			};
+			$jdata = "$calback_name( $jdata );" if $calback_name;
 			$self->reply( $code, $jdata, %args );
 			
 		}
