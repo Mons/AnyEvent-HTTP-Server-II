@@ -2,9 +2,10 @@
 
 #use strict;
 use EV;
+#use AnyEvent::Impl::Perl;
 use AnyEvent;
 use AnyEvent::Socket;
-use Errno;
+#use Errno;
 
 tcp_server 0, 8080, sub {
 	binmode my $fh = shift, ':raw';
@@ -22,4 +23,5 @@ tcp_server 0, 8080, sub {
 	};
 };
 
+#AnyEvent::Loop::run()
 EV::loop;

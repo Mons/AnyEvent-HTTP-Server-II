@@ -81,8 +81,8 @@ test_server {
 		}
 	}
 }	'read body',
-	[["GET /test1 HTTP/1.1\nHost:localhost\nConnection:keep-alive\n\n"],                          200, { 'x-test' => 1 }, "GET:/test1:localhost",'' ],
-	[["GET /test2 HTTP/1.1\nHost:localhost\nConnection:keep-alive\n\n"],                          200, { 'x-test' => 2 }, "GET:/test2:localhost",'' ],
+	[["GET /test1 HTTP/1.1\nHost:localhost\nConnection:keep-alive\n\n"],                          200, { 'x-test' => 1 }, "GET:/test1:localhost:0:",'' ],
+	[["GET /test2 HTTP/1.1\nHost:localhost\nConnection:keep-alive\n\n"],                          200, { 'x-test' => 2 }, "GET:/test2:localhost:0:",'' ],
 	[["METHOD /test3 HTTP/1.1\nHost:localhost\nConnection:keep-alive\nContent-Length:4\n\ntest"], 400, { 'x-test' => 3 }, "METHOD:/test3:localhost", $PARTIAL ? ":1:t:1:e:1:s:1:t" : ':4:test' ],
 if ALL;
 

@@ -10,7 +10,7 @@ Version 1.97
 
 =cut
 
-our $VERSION = '1.97';
+our $VERSION = '1.981';
 
 
 
@@ -175,6 +175,14 @@ sub drop {
 		if $self->{graceful} and $self->{active_requests} == 0;
 }
 
+sub req_wbuf_len {
+	my $self = shift;
+	my $req = shift;
+	return undef unless exists $self->{ $req->headers->{INTERNAL_REQUEST_ID} };
+	return 0 unless exists $self->{ $req->headers->{INTERNAL_REQUEST_ID} }{wbuf};
+	return length ${ $self->{ $req->headers->{INTERNAL_REQUEST_ID} }{wbuf} };
+}
+
 sub incoming {
 	weaken( my $self = shift );
 	#warn "incoming @_";
@@ -337,7 +345,7 @@ sub incoming {
 								my @rv = $self->{cb}->( $req = bless [ $method, $uri, \%h, $write, undef,undef,undef, \$self->{active_requests}, $self ], 'AnyEvent::HTTP::Server::Req' );
 								weaken( $req->[8] );
 								#my @rv = $self->{cb}->( $req = bless [ $method, $uri, \%h, $write ], 'AnyEvent::HTTP::Server::Req' );
-								if (@rv) {
+                                				if (@rv) {
 									if (ref $rv[0] eq 'CODE') {
 										$r{on_body} = $rv[0];
 									}
@@ -435,7 +443,9 @@ sub incoming {
 												#}
 											};
 										}
-										elsif ( $h{'content-type'} =~ m{^application/x-www-form-urlencoded(?:\Z|\s*;)}i and exists $rv[0]{form} ) {
+#										elsif ( $h{'content-type'} =~ m{^application/x-www-form-urlencoded(?:\Z|\s*;)}i and exists $rv[0]{form} ) {
+
+										elsif (  exists $rv[0]{form} ) {
 											my $body = '';
 											$r{on_body} = sub {
 												my ($last,$part) = @_;
@@ -444,7 +454,7 @@ sub incoming {
 												}
 												$body .= $$part;
 												if ($last) {
-													$rv[0]{form}( $req->form($body), \$body );
+													$rv[0]{form}( $req->form($body), $body );
 													delete $r{on_body};
 												}
 											};
@@ -502,7 +512,7 @@ sub incoming {
 							#elsif (chunked) { TODO }
 							else {
 								#warn "No clen";
-								$r{on_body}(1) if $r{on_body};
+								$r{on_body}(1,\('')) if $r{on_body};
 								# FINISHED
 								#warn "3. finished request" . Dumper($req);
 								#warn "pos = $pos, lbuf=".length $buf;

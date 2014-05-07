@@ -127,7 +127,7 @@ use AnyEvent::HTTP::Server::Kit;
 		
 		sub replyjs {
 			my $self = shift;
-			warn "Replyjs: @_ by @{[ (caller)[1,2] ]}";
+			#warn "Replyjs: @_ by @{[ (caller)[1,2] ]}";
 			my ($code,$data,%args);
 			$code = ref $_[0] ? 200 : shift;
 			$data = shift;
@@ -135,6 +135,7 @@ use AnyEvent::HTTP::Server::Kit;
 			$args{headers} ||= {};
 			$args{headers}{'content-type'} ||= 'application/json';
 			my $pretty = delete $args{pretty};
+			my $calback_name = delete $args{jsonp_callback};
 			$JSON or do {
 				eval { require JSON::XS;1 }
 					or do {
@@ -153,6 +154,7 @@ use AnyEvent::HTTP::Server::Kit;
 				$self->reply(500,'{error: "Internal Server Error"}', %args);
 				return;
 			};
+			$jdata = "$calback_name( $jdata );" if $calback_name;
 			$self->reply( $code, $jdata, %args );
 			
 		}
@@ -210,7 +212,7 @@ use AnyEvent::HTTP::Server::Kit;
 		
 		sub reply {
 			my $self = shift;
-			return $self->headers(@_) if @_ % 2;
+			#return $self->headers(@_) if @_ % 2;
 			my ($code,$content,%args) = @_;
 			$code ||=200;
 			#if (ref $content) {
@@ -237,10 +239,10 @@ use AnyEvent::HTTP::Server::Kit;
 			if (exists $h->{'content-type'}) {
 				if( $h->{'content-type'} !~ m{[^;]+;\s*charset\s*=}
 				and $h->{'content-type'} =~ m{(?:^(?:text/|application/(?:json|(?:x-)?javascript))|\+(?:json|xml)\b)}i) {
-					$h->{'content-type'} .= '; charset=UTF-8';
+					$h->{'content-type'} .= '; charset=utf-8';
 				}
 			} else {
-				$h->{'content-type'} = 'text/html; charset=UTF-8';
+				$h->{'content-type'} = 'text/html; charset=utf-8';
 			}
 			for (keys %$h) {
 				if (exists $hdr{lc $_}) { $good[ $hdri{lc $_} ] = $hdr{ lc $_ }.": ".$h->{$_}.$LF; }
@@ -260,7 +262,7 @@ use AnyEvent::HTTP::Server::Kit;
 		sub send_headers {
 			my ($self,$code,%args) = @_;
 			$code ||= 200;
-			my $reply = "HTTP/1.0 $code $http{$code}$LF";
+			my $reply = "HTTP/1.1 $code $http{$code}$LF";
 			my @good;my @bad;
 			my $h = {
 				%{ $args{headers} || {} },
@@ -288,16 +290,16 @@ use AnyEvent::HTTP::Server::Kit;
 			my $content = shift;
 			utf8::encode $content if utf8::is_utf8 $content;
 			my $length = sprintf "%x", length $content;
-			#warn "send body part $length\n$content\n";
+			#warn "send body part $length / ".length($content)."\n";
 			$self->[3]->( \("$length$LF$content$LF") );
 		}
 		
 		sub finish {
 			my $self = shift;
 			$self->[4] or die "Need to be chunked reply";
-			#warn "send body end\n";
+			#warn "send body end (".$self->connection.")\n";
 			if( $self->[3] ) {
-				$self->[3]->( \("0$LF")  );
+				$self->[3]->( \("0$LF$LF")  );
 				$self->[3]->(\undef) if $self->connection eq 'close' or $self->[SERVER]{graceful};
 				delete $self->[3];
 				${ $self->[REQCOUNT] }--;
