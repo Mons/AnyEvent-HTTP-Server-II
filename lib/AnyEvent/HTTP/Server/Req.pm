@@ -18,7 +18,8 @@ use overload
 }
 
 use AnyEvent::HTTP::Server::Kit;
-	
+use Time::HiRes qw/gettimeofday/;
+
 	our @hdr = map { lc $_ }
 	our @hdrn  = qw(Upgrade Connection Content-Type WebSocket-Origin WebSocket-Location Sec-WebSocket-Origin Sec-Websocket-Location Sec-WebSocket-Key Sec-WebSocket-Accept Sec-WebSocket-Protocol);
 	our %hdr; @hdr{@hdr} = @hdrn;
@@ -240,6 +241,7 @@ use AnyEvent::HTTP::Server::Kit;
 			}
 			defined() and $reply .= $_ for @good,@bad;
 			$reply .= $LF.$content;
+			if( $self->[8] && $self->[8]->{stat_cb} ){ $self->[8]->{stat_cb}->($self->path, $self->method, gettimeofday() - $self->[9]) };
 			#if (!ref $content) { $reply .= $content }
 			if( $self->[3] ) {
 				$self->[3]->( \$reply );
