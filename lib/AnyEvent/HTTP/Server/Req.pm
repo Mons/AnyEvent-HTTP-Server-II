@@ -126,7 +126,12 @@ use Time::HiRes qw/gettimeofday/;
 			$args{headers} ||= {};
 			$args{headers}{'content-type'} ||= 'application/json';
 			my $pretty = delete $args{pretty};
-			my $calback_name = delete $args{jsonp_callback};
+			my $callback_name = delete $args{jsonp_callback};
+			if( $callback_name !~ /^[$a-zA-Z_][0-9a-zA-Z_$]*$/ ){
+				warn "jsonp callbackname is invalid $callback_name. Called from @{[ (caller)[1,2] ]}\n";
+				$self->reply(500,'{error: "Internal Server Error" }', %args);
+				return;
+			}
 			$JSON or do {
 				eval { require JSON::XS;1 }
 					or do {
@@ -145,7 +150,7 @@ use Time::HiRes qw/gettimeofday/;
 				$self->reply(500,'{error: "Internal Server Error"}', %args);
 				return;
 			};
-			$jdata = "$calback_name( $jdata );" if $calback_name;
+			$jdata = "$callback_name( $jdata );" if $callback_name;
 			$self->reply( $code, $jdata, %args );
 			
 		}
