@@ -4,43 +4,6 @@ package AnyEvent::HTTP::Server;
 
 AnyEvent::HTTP::Server - AnyEvent HTTP/1.1 Server
 
-    use AnyEvent::HTTP::Server;
-    my $s = AnyEvent::HTTP::Server->new(
-        host => '0.0.0.0',
-        port => 80,
-        stat_cb => {
-        	my ($url, $method, $timehires) = @_;
-      		...
-        },
-        cb   => sub {
-            my $req = shift;
-            return sub {
-                my ($is_last, $bodypart) = @_;
-                $r->reply(200, "<h1>Reply message</h1>", headers => { 'content-type' => 'text/html' });
-            }
-        }
-    );
-    $s->listen;
-    
-    ## you may also prefork on N cores:
-    
-    # fork() ? next : last for (1..$N-1);
-    
-    ## Of course this is very simple example
-    ## don't use such prefork in production
-    
-    $s->accept;
-    
-    my $sig = AE::signal INT => sub {
-        warn "Stopping server";
-        $s->graceful(sub {
-            warn "Server stopped";
-            EV::unloop;
-        });
-    };
-    
-    EV::loop;
-
 =head1 VERSION
 
 Version 1.97
