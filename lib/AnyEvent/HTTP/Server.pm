@@ -365,6 +365,13 @@ sub incoming {
 								$write->(\undef) if lc $h{connecton} =~ /^close\b/;
 								$self->{active_requests}--;
 								$ixx = $pos + $h{'content-length'};
+							} elsif ( $method eq "GET" and $uri =~ m{^/ping( \Z | \? )}sox ) {
+								my ( $header_str, $content ) = ref $self->{ping_sub} eq 'CODE' ? $self->{ping_sub}->() : ('200 OK', 'Pong');
+								my $str = "HTTP/1.1 $header_str${LF}Connection:close${LF}Content-Type:text/plain${LF}Content-Length:".length($content)."${LF}${LF}".$content;
+								$write->(\$str);
+								$write->(\undef) if lc $h{connecton} =~ /^close\b/;
+								$self->{active_requests}--;
+								$ixx = $pos + $h{'content-length'};
 							} else {
 								#warn "Create request object";
 								#$req = AnyEvent::HTTP::Server::Req->new(
