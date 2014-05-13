@@ -12,9 +12,6 @@ Version 1.97
 
 our $VERSION = '1.981';
 
-
-
-
 #use common::sense;
 #use 5.008008;
 #use strict;
@@ -37,6 +34,7 @@ use Socket qw(AF_INET AF_UNIX SOCK_STREAM SOCK_DGRAM SOL_SOCKET SO_REUSEADDR IPP
 use Encode ();
 use Compress::Zlib ();
 use MIME::Base64 ();
+use Time::HiRes qw/gettimeofday/;
 
 #use Carp 'croak';
 
@@ -332,6 +330,13 @@ sub incoming {
 								$write->(\undef) if lc $h{connecton} =~ /^close\b/;
 								$self->{active_requests}--;
 								$ixx = $pos + $h{'content-length'};
+							} elsif ( $method eq "GET" and $uri =~ m{^/ping( \Z | \? )}sox ) {
+								my ( $header_str, $content ) = ref $self->{ping_sub} eq 'CODE' ? $self->{ping_sub}->() : ('200 OK', 'Pong');
+								my $str = "HTTP/1.1 $header_str${LF}Connection:close${LF}Content-Type:text/plain${LF}Content-Length:".length($content)."${LF}${LF}".$content;
+								$write->(\$str);
+								$write->(\undef) if lc $h{connecton} =~ /^close\b/;
+								$self->{active_requests}--;
+								$ixx = $pos + $h{'content-length'};
 							} else {
 								#warn "Create request object";
 								#$req = AnyEvent::HTTP::Server::Req->new(
@@ -342,7 +347,7 @@ sub incoming {
 								#	guard   => guard { $self->{active_requests}--; },
 								#);
 								#my @rv = $self->{cb}->( $req );
-								my @rv = $self->{cb}->( $req = bless [ $method, $uri, \%h, $write, undef,undef,undef, \$self->{active_requests}, $self ], 'AnyEvent::HTTP::Server::Req' );
+								my @rv = $self->{cb}->( $req = bless [ $method, $uri, \%h, $write, undef,undef,undef, \$self->{active_requests}, $self, gettimeofday() ], 'AnyEvent::HTTP::Server::Req' );
 								weaken( $req->[8] );
 								#my @rv = $self->{cb}->( $req = bless [ $method, $uri, \%h, $write ], 'AnyEvent::HTTP::Server::Req' );
                                 				if (@rv) {
