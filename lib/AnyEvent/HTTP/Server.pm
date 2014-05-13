@@ -14,6 +14,10 @@ our $VERSION = '1.981';
     my $s = AnyEvent::HTTP::Server->new(
         host => '0.0.0.0',
         port => 80,
+        stat_cb => {
+        	my ($url, $method, $timehires) = @_;
+      		...
+        },
         cb   => sub {
             my $req = shift;
             return sub {
@@ -67,6 +71,7 @@ use Socket qw(AF_INET AF_UNIX SOCK_STREAM SOCK_DGRAM SOL_SOCKET SO_REUSEADDR IPP
 use Encode ();
 use Compress::Zlib ();
 use MIME::Base64 ();
+use Time::HiRes qw/gettimeofday/;
 
 #use Carp 'croak';
 
@@ -370,7 +375,7 @@ sub incoming {
 								#	guard   => guard { $self->{active_requests}--; },
 								#);
 								#my @rv = $self->{cb}->( $req );
-								my @rv = $self->{cb}->( $req = bless [ $method, $uri, \%h, $write, undef,undef,undef, \$self->{active_requests}, $self ], 'AnyEvent::HTTP::Server::Req' );
+								my @rv = $self->{cb}->( $req = bless [ $method, $uri, \%h, $write, undef,undef,undef, \$self->{active_requests}, $self, gettimeofday() ], 'AnyEvent::HTTP::Server::Req' );
 								weaken( $req->[8] );
 								#my @rv = $self->{cb}->( $req = bless [ $method, $uri, \%h, $write ], 'AnyEvent::HTTP::Server::Req' );
                                 				if (@rv) {
