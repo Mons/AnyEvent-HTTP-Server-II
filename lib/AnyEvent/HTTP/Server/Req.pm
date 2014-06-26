@@ -134,7 +134,7 @@ use Time::HiRes qw/gettimeofday/;
 			$data = shift;
 			%args = @_;
 			$args{headers} ||= {};
-			$args{headers}{'content-type'} ||= 'application/json';
+			$args{headers}{'content-type'} ||= 'text/json';
 			my $pretty = delete $args{pretty};
 			my $callback_name = delete $args{jsonp_callback};
 			!$callback_name or $callback_name =~ /^[a-zA-Z_][0-9a-zA-Z_]*$/ or do {
@@ -326,8 +326,8 @@ use Time::HiRes qw/gettimeofday/;
 		
 		sub DESTROY {
 			my $self = shift;
-			#warn "Destroy req $self->[0] $self->[1] by @{[ (caller)[1,2] ]}";
 			if( $self->[3] ) {
+				warn "Destroy req $self->[0] $self->[1] by @{[ (caller)[1,2] ]}\n";
 				if ($self->[4]) {
 					$self->body(" response truncated");
 					$self->abort();

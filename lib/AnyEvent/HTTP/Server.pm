@@ -10,7 +10,7 @@ Version 1.97
 
 =cut
 
-our $VERSION = '1.981';
+our $VERSION = '1.982';
 
 #use common::sense;
 #use 5.008008;
@@ -368,34 +368,174 @@ sub incoming {
 										
 											my $bnd = '--'.( defined $1 ? do { my $x = $1; $x =~ s{\\(.)}{$1}gs; $x } : $2 );
 											my $body = '';
-											#warn "reading multipart with boundary '$bnd'";
+											warn "reading multipart with boundary '$bnd'";
 											#warn "set on_body";
 											my $cb = $rv[0]{multipart};
+											
+											sub MULTI_PREAMBLE() { 0 };
+											sub MULTI_BOUNDARY() { 1 };
+											sub MULTI_HEADERS()  { 2 };
+											sub MULTI_BODY()     { 3 };
+											
+											my $m_state = 0;
+											my $partno = 0;
+											my $curr_headers;
+											
+											use Data::Dumper;
+											$Data::Dumper::Useqq = 1;
+											my $partno = -1;
 											$r{on_body} = sub {
 												my ($last,$part) = @_;
+												warn "on_body ".length $$part;
 												if ( length($body) + length($$part) > $self->{max_body_size} ) {
 													# TODO;
 												}
 												$body .= $$part;
+												#warn '>'.$body;
+												
+												{
+													if ($m_state == MULTI_PREAMBLE) {
+														if ($body =~ m{ ^ (?:\015?\012)? \Q$bnd\E \015?\012  }xgc) {
+															$m_state = MULTI_HEADERS;
+														}
+														elsif (length $body > length $bnd) {
+															# ERROR
+															delete $r{on_body};
+															return $cb->($partno,{},'',1,"Not found preamble boundary");
+														}
+														else {
+															return;
+														}
+													}
+												}
+												while () {
+													warn "enter loop $m_state";
+													if ($m_state == MULTI_BOUNDARY) {
+														if ($body =~ m{ \G \015?\012 \Q$bnd\E }xgc) {
+															if ( $body =~ m{ \G -- }xgc ) {
+																warn "no more";
+																delete $r{on_body};
+																return $cb->(-1, {}, '',1);
+															}
+															if ( $body =~ m{ \G \015?\012 }xgc ) {
+																$m_state = MULTI_HEADERS;
+															}
+															else {
+																$m_state = MULTI_HEADERS;
+																# ??
+															}
+														}
+														else {
+															die "no boundary match";
+														}
+													}
+													if ( $m_state == MULTI_HEADERS ) {
+														my $start = pos $body;
+														if ($body =~ m{ \015?\012\015?\012 }xgc) {
+															++$partno;
+															my $part = substr($body,$start,pos($body)-$start);
+															#warn "headers: $part";
+															my %hd;
+															my $lk;
+															while () {
+																if( $part =~ /\G ([^:\000-\037\040]+)[\011\040]*:[\011\040]* ([^\012\015;]+(;)?[^\012\015]*) \015?\012/sxogc ){
+																	$lk = lc $1;
+																	$hd{ $lk } = exists $hd{ $lk } ? $hd{ $lk }.','.$2 : $2;
+																	if ( defined $3 ) {
+																		pos(my $v = $2) = $-[3] - $-[2];
+																		$hd{ $lk . '+' . lc($1) } = ( defined $2 ? do { my $x = $2; $x =~ s{\\(.)}{$1}gs; $x } : $3 )
+																			while ( $v =~ m{ \G ; \s* ([^\s=]+)\s*= (?: "((?:[^\\"]+|\\.)*)" | ([^;,\s]+) ) \s* }gcxso ); # "
+																	}
+																}
+																elsif ($part =~ /\G[\011\040]+/sxogc and length $lk) { # continuation
+																	$part =~ /\G([^\015\012]+)\015?\012/sxogc or next;
+																	$hd{ $lk } .= ' '.$1;
+																	if ( ( my $ext = index( $hd{ $lk }, ';', rindex( $hd{ $lk }, ',' ) + 1) ) > -1 ) {
+																		# Composite field. Need to reparse last field value (from ; after last ,)
+																		pos($hd{ $lk }) = $ext;
+																		$hd{ $lk . '+' . lc($1) } = ( defined $2 ? do { my $x = $2; $x =~ s{\\(.)}{$1}gs; $x } : $3 )
+																			while ( $hd{ $lk } =~ m{ \G ; \s* ([^\s=]+)\s*= (?: "((?:[^\\"]+|\\.)*)" | ([^;,\s]+) ) \s* }gcxso ); # "
+																	}
+																}
+																elsif ($part =~ /\G\015?\012/sxogc) {
+																	last;
+																}
+															}
+															$curr_headers = \%hd;
+															$m_state = MULTI_BODY;
+														} else {
+															#warn "no headers ".Dumper(substr($body,pos($body)));
+															return;
+														}
+													}
+													if ($m_state == MULTI_BODY) {
+														my $start = pos($body);
+														if ($body =~ m{ (?=\015?\012 \Q$bnd\E ) }xgc) {
+															warn "got body, call $cb";
+															$cb->($partno, $curr_headers, substr($body, $start, pos($body) - $start ));
+															
+															#warn "$start..".pos($body).": ".Dumper(substr( $body,$start,pos($body) - $start ));
+															$m_state = MULTI_BOUNDARY();
+														}
+														elsif (length $body > 2 + length $bnd) {
+															$cb->($partno, $curr_headers, substr($body, $start, length($body) - pos($body) - 2) );
+														}
+														else {
+															warn "no body end";
+														}
+													}
+													
+													#warn "next: ".Dumper(substr( $body,pos($body),10 ));
+												}
+												
+												#while ($body =~ m{ \G \Q$bnd\E(--|)\015?\012 }gx) {
+												#	if ($1) {
+												#		warn "last part";
+												#	} else {
+												#		warn pos($body);
+												#	}
+												#	
+												#}
+												
 												#warn "Checking body '".$body."'";
-												my $idx = index( $body, $bnd );
+												#my $idx = 0;
+												#my $end = index( $body, $bnd );
+												#warn "$idx, $end";
+												#$idx = $end + length($bnd);
+												
+												#$idx++ if substr($body,$idx,1) eq "\015";
+												#$idx++ if substr($body,$idx,1) eq "\012";
+												
+												#warn "next content: ".substr($body, $idx, 10);
+												
+												#{do {
+												#	my $end = index( $body, $bnd, $idx );
+												#	warn "$idx..$end: ".Dumper(substr($body,$idx,$end-$idx));
+												#	$idx = $end+length $bnd;
+												#}while( $end > -1 )};
+												#my $idx = index( $body, $bnd );
+												
+												return;
+=for rem
 												while ( $idx > -1 and (
-													( $idx + length($bnd) + 1 <= length($body) and substr($body,$idx+length($bnd),1) eq "\012" )
-													or
 													( $idx + length($bnd) + 2 <= length($body) and substr($body,$idx+length($bnd),2) eq "\015\012" )
+													or
+													( $idx + length($bnd) + 4 <= length($body) and substr($body,$idx+length($bnd),4) eq "--\015\012" )
+													or
+													( $idx + length($bnd) + 1 <= length($body) and substr($body,$idx+length($bnd),1) eq "\012" )
 												) ) {
-													#warn "have part";
+													warn "have part";
 													my $part = substr($body,$idx-2,1) eq "\015" ? substr($body,0,$idx-2) : substr($body,0,$idx-1);
-													#warn Dumper $part;
+													warn Dumper $part;
 													#substr($part, 0, ( substr($part,0,1) eq "\015" ) ? 2 : 1,'');
-													#warn "captured $idx: '$part'";
+													warn "captured $idx: '$part'";
 													$body = substr($body,$idx + length $bnd);
 													substr($body,0, ( substr($body,0,1) eq "\015" ) ? 2 : 1 ,'');
-													#warn "body = '$body'";
+													warn "body = '$body'";
 													$idx = index( $body, $bnd );
-													#warn "next part idx: $idx";
+													warn "next part idx: $idx";
 													length $part or next;
-													#warn "Process part '$part'";
+													warn "Process part '$part'";
 													
 													my %hd;
 													my $lk;
@@ -442,7 +582,8 @@ sub incoming {
 													#warn "call for part $hd{name} ($last)";
 													$cb->( $last && $idx == -1 ? 1 : 0,$part,\%hd );
 												}
-												#warn "just return";
+=cut
+												warn "just return '$body'";
 												#if ($last) {
 													#warn "leave with $body";
 												#}

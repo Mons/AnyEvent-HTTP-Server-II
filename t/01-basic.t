@@ -149,7 +149,7 @@ Content-Type: image/jpeg
 Content-Transfer-Encoding: base64
 
 dGVzdA==
---Test
+--Test--
 };
 
 =for
