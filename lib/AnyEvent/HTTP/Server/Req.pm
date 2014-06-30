@@ -20,7 +20,7 @@ use overload
 use AnyEvent::HTTP::Server::Kit;
 	
 	our @hdr = map { lc $_ }
-	our @hdrn  = qw(Upgrade Connection Content-Type WebSocket-Origin WebSocket-Location Sec-WebSocket-Origin Sec-Websocket-Location Sec-WebSocket-Key Sec-WebSocket-Accept Sec-WebSocket-Protocol);
+	our @hdrn  = qw(Upgrade Connection Content-Type WebSocket-Origin WebSocket-Location Sec-WebSocket-Origin Sec-Websocket-Location Sec-WebSocket-Key Sec-WebSocket-Accept Sec-WebSocket-Protocol DataServiceVersion);
 	our %hdr; @hdr{@hdr} = @hdrn;
 	our %hdri; @hdri{ @hdr } = 0..$#hdr;
 	our $LF = "\015\012";
