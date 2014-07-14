@@ -143,6 +143,8 @@ use AnyEvent::HTTP::Server::Kit;
 				$self->reply(500,'{error: "Internal Server Error"}', %args);
 				return;
 			};
+			$jdata =~ s{<}{\\u003c}sg;
+			$jdata =~ s{>}{\\u003e}sg;
 			$self->reply( $code, $jdata, %args );
 			
 		}

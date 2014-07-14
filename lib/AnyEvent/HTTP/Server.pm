@@ -6,7 +6,7 @@ AnyEvent::HTTP::Server - AnyEvent HTTP/1.1 Server
 
 =cut
 
-our $VERSION = '1.981';
+our $VERSION = '1.982';
 
 =head1 SYNOPSIS
 
