@@ -112,9 +112,15 @@ use Time::HiRes qw/gettimeofday/;
 			$_[0][6] = +{ map { my ($k,$v) = split /=/,$_,2; +( url_unescape($k) => url_unescape($v) ) } split /&/, $_[0][5][3] };
 		}
 		
+		
 		sub path    {
 			$_[0][5] or $_[0]->uri_parse;
 			$_[0][5][2];
+		}
+		
+		sub params {
+			$_[0][6] or $_[0]->uri_parse;
+			$_[0][6];
 		}
 		
 		sub param {
@@ -334,7 +340,8 @@ use Time::HiRes qw/gettimeofday/;
 					$self->body(" response truncated");
 					$self->abort();
 				} else {
-					$self->reply( 404, "Request not handled\n$self->[0] $self->[1]\n", headers => { 'content-type' => 'text/plain' } );
+					#$self->reply( 404, "Request not handled\n$self->[0] $self->[1]\n", headers => { 'content-type' => 'text/plain' } );
+					$self->reply( 500, "Request not handled\n$self->[0] $self->[1]\n", headers => { 'content-type' => 'text/plain' } );
 					#$self->[3]->(\("HTTP/1.0 404 Not Found\nConnection:close\nContent-type:text/plain\n\nRequest not handled\n"));
 				}
 			}
