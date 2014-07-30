@@ -222,12 +222,12 @@ test_server {
 	my $r = shift;
 	return;
 }	'overlap',
-	[["GET /test1 HTTP/1.1\nHost:localhost\nConnection:keep-alive\n\n"],                          404, {}, "Request not handled\nGET /test1\n" ],
-	[["GET /test2 HTTP/1.1\nHost:localhost\nConnection:keep-alive\n\nGET"],                       404, {}, "Request not handled\nGET /test2\n" ],
-	[[" /test3 HTTP/1.1\nHost:localhost\nConnection:keep-alive\n\n"],                             404, {}, "Request not handled\nGET /test3\n" ],
-	[["POST /test4 HTTP/1.1\nHost:localhost\nConnection:keep-alive\nContent-Length:4\n\ntestPOST"], 404, {}, "Request not handled\nPOST /test4\n",'' ],
-	[[" /test5 HTTP/1.1\nHost:localhost\nConnection:keep-alive\nContent-Length:4\n\ntest"],        404, {}, "Request not handled\nPOST /test5\n",'' ],
-	[["POST /test6 HTTP/1.1\nHost:localhost\nConnection:keep-alive\nContent-Length:4\n\nte","st"], 404, {}, "Request not handled\nPOST /test6\n",'' ],
+	[["GET /test1 HTTP/1.1\nHost:localhost\nConnection:keep-alive\n\n"],                          500, {}, "Request not handled\nGET /test1\n" ],
+	[["GET /test2 HTTP/1.1\nHost:localhost\nConnection:keep-alive\n\nGET"],                       500, {}, "Request not handled\nGET /test2\n" ],
+	[[" /test3 HTTP/1.1\nHost:localhost\nConnection:keep-alive\n\n"],                             500, {}, "Request not handled\nGET /test3\n" ],
+	[["POST /test4 HTTP/1.1\nHost:localhost\nConnection:keep-alive\nContent-Length:4\n\ntestPOST"], 500, {}, "Request not handled\nPOST /test4\n",'' ],
+	[[" /test5 HTTP/1.1\nHost:localhost\nConnection:keep-alive\nContent-Length:4\n\ntest"],        500, {}, "Request not handled\nPOST /test5\n",'' ],
+	[["POST /test6 HTTP/1.1\nHost:localhost\nConnection:keep-alive\nContent-Length:4\n\nte","st"], 500, {}, "Request not handled\nPOST /test6\n",'' ],
 #	[["GET /test2 HTTP/1.1\nHost:localhost\nConnection:keep-alive\n\n"],                          200, { 'x-test' => 2 }, "GET:/test2:localhost" ],
 #	[["METHOD /test3 HTTP/1.1\nHost:localhost\nConnection:keep-alive\nContent-Length:4\n\ntest"], 400, { 'x-test' => 3 }, "METHOD:/test3:localhost" ],
 if ALL;
@@ -237,7 +237,7 @@ test_server_close {
 	my $r = shift;
 	return;
 }	'connection close',
-	[["GET /test1 HTTP/1.1\nHost:localhost\nConnection:close\n\n"],                          404, {}, "Request not handled\nGET /test1\n" ],
+	[["GET /test1 HTTP/1.1\nHost:localhost\nConnection:close\n\n"],                          500, {}, "Request not handled\nGET /test1\n" ],
 if ALL;
 
 }
