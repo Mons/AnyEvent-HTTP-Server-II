@@ -343,10 +343,10 @@ sub incoming {
 								#	guard   => guard { $self->{active_requests}--; },
 								#);
 								#my @rv = $self->{cb}->( $req );
-								my @rv = $self->{cb}->( $req = bless [ $method, $uri, \%h, $write, undef,undef,undef, \$self->{active_requests}, $self, gettimeofday() ], 'AnyEvent::HTTP::Server::Req' );
+								my @rv = $self->{cb}->( $req = bless [ $method, $uri, \%h, $write, undef,undef,undef, \$self->{active_requests}, $self, scalar gettimeofday() ], 'AnyEvent::HTTP::Server::Req' );
 								weaken( $req->[8] );
 								#my @rv = $self->{cb}->( $req = bless [ $method, $uri, \%h, $write ], 'AnyEvent::HTTP::Server::Req' );
-                                				if (@rv) {
+								if (@rv) {
 									if (ref $rv[0] eq 'CODE') {
 										$r{on_body} = $rv[0];
 									}

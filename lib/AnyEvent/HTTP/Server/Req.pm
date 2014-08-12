@@ -58,6 +58,8 @@ use Time::HiRes qw/gettimeofday/;
 			QUERY     => 6,
 			REQCOUNT  => 7,
 			SERVER    => 8,
+			TIME      => 9,
+			CTX       => 10,
 		};
 		
 		sub connection { $_[0][2]{connection} =~ /^([^;]+)/ && lc( $1 ) }
@@ -258,13 +260,13 @@ use Time::HiRes qw/gettimeofday/;
 			} else {
 				$h->{'content-type'} = 'text/html; charset=utf-8';
 			}
+			my $nh = delete $h->{NotHandled};
 			for (keys %$h) {
 				if (exists $hdr{lc $_}) { $good[ $hdri{lc $_} ] = $hdr{ lc $_ }.": ".$h->{$_}.$LF; }
 				else { push @bad, "\u\L$_\E: ".$h->{$_}.$LF; }
 			}
 			defined() and $reply .= $_ for @good,@bad;
 			$reply .= $LF.$content;
-			if( $self->[8] && $self->[8]->{stat_cb} ){ $self->[8]->{stat_cb}->($self->path, $self->method, gettimeofday() - $self->[9]) };
 			#if (!ref $content) { $reply .= $content }
 			if( $self->[3] ) {
 				$self->[3]->( \$reply );
@@ -272,6 +274,26 @@ use Time::HiRes qw/gettimeofday/;
 				delete $self->[3];
 				${ $self->[REQCOUNT] }--;
 			}
+			if( $self->[8] && $self->[8]->{on_reply} ) {
+				$h->{ResponseTime} = gettimeofday() - $self->[9];
+				$h->{Status} = $code;
+				$h->{NotHandled} = $nh if $nh;
+				#eval {
+					$self->[8]->{on_reply}->(
+						$self,
+						$h,
+					);
+				#1} or do {
+				#	warn "on_reply died with $@";
+				#};
+			};
+			if( $self->[8] && $self->[8]->{stat_cb} ) {
+				eval {
+					$self->[8]->{stat_cb}->($self->path, $self->method, gettimeofday() - $self->[9]);
+				1} or do {
+					warn "stat_cb died with $@";
+				}
+			};
 		}
 		
 		sub send_headers {
@@ -334,17 +356,29 @@ use Time::HiRes qw/gettimeofday/;
 		
 		sub DESTROY {
 			my $self = shift;
-			#warn "Destroy req $self->[0] $self->[1] by @{[ (caller)[1,2] ]}";
+			my $caller = "@{[ (caller)[1,2] ]}";
+			#warn "Destroy req $self->[0] $self->[1] by $caller";
 			if( $self->[3] ) {
-				if ($self->[4]) {
-					$self->body(" response truncated");
-					$self->abort();
-				} else {
-					#$self->reply( 404, "Request not handled\n$self->[0] $self->[1]\n", headers => { 'content-type' => 'text/plain' } );
-					$self->reply( 500, "Request not handled\n$self->[0] $self->[1]\n", headers => { 'content-type' => 'text/plain' } );
-					#$self->[3]->(\("HTTP/1.0 404 Not Found\nConnection:close\nContent-type:text/plain\n\nRequest not handled\n"));
-				}
-			}
+				eval {
+					if ($self->[4]) {
+						$self->abort();
+					} else {
+						if( $self->[8] && $self->[8]->{on_not_handled} ) {
+							$self->[8]->{on_not_handled}->($self, $caller);
+						}
+						if ($self->[3]) {
+							$self->reply( 500, "Request not handled\n$self->[0] $self->[1]\n", headers => { 'content-type' => 'text/plain', NotHandled => 1 } );
+						}
+					}
+				1} or do {
+					if ($EV::DIED) {
+						@_ = ();
+						goto &$EV::DIED;
+					} else {
+						warn "[E] Died in request DESTROY: $@ from $caller\n";
+					}
+				};
+			};
 			@$self = ();
 		}
 
