@@ -160,7 +160,7 @@ sub noaccept {
 sub drop {
 	my ($self,$id,$err) = @_;
 	$err =~ s/\015//sg;
-	#warn "Dropping connection $id: $err (by request from @{[ (caller)[1,2] ]})";# if DEBUG or $self->{debug};
+	warn "Dropping connection $id: $err (by request from @{[ (caller)[1,2] ]})";# if DEBUG or $self->{debug};
 	my $r = delete $self->{$id};
 	$self->{active_connections}--;
 	%{ $r } = () if $r;
@@ -192,8 +192,10 @@ sub incoming {
 		
 		my $write = sub {
 			$self and exists $self->{$id} or return;
+			use Data::Dumper;
 			for my $buf (@_) {
 				ref $buf or do { $buf = \( my $str = $buf ); warn "Passed nonreference buffer from @{[ (caller)[1,2] ]}\n"; };
+				warn Dumper $buf;
 				if ( $self->{$id}{wbuf} ) {
 					$self->{$id}{closeme} and return warn "Write ($$buf) called while connection close was enqueued at @{[ (caller)[1,2] ]}";
 					${ $self->{$id}{wbuf} } .= defined $$buf ? $$buf : return $self->{$id}{closeme} = 1;
@@ -466,6 +468,28 @@ sub incoming {
 										else {
 											die "XXX";
 										}
+									}
+									elsif ($rv[0] eq 'HANDLE') {
+										#warn "creating handle ".Dumper \$buf;
+										delete $r{rw};
+										my $h = AnyEvent::Handle->new(
+											fh => $fh,
+										);
+										$h->{rbuf} = substr($buf,$pos);
+										$req->[3] = sub {
+											my $rbuf = shift;
+											if (defined $$rbuf) {
+												$h->push_write( $$rbuf );
+											} else {
+												$h->destroy;
+												undef $h;
+												$self->drop($id);
+											}
+										};
+										$rv[1]->($h);
+										weaken($req);
+										%r = ( );
+										return;
 									}
 									elsif ( $rv[0] ) {
 										$req->reply(@rv);
