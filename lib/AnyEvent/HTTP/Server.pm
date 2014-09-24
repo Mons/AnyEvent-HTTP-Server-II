@@ -6,7 +6,7 @@ AnyEvent::HTTP::Server - AnyEvent HTTP/1.1 Server
 
 =cut
 
-our $VERSION = '1.9821';
+our $VERSION = '1.983';
 
 #use common::sense;
 #use 5.008008;
@@ -160,7 +160,7 @@ sub noaccept {
 sub drop {
 	my ($self,$id,$err) = @_;
 	$err =~ s/\015//sg;
-	warn "Dropping connection $id: $err (by request from @{[ (caller)[1,2] ]})";# if DEBUG or $self->{debug};
+	#warn "Dropping connection $id: $err (by request from @{[ (caller)[1,2] ]})";# if DEBUG or $self->{debug};
 	my $r = delete $self->{$id};
 	$self->{active_connections}--;
 	%{ $r } = () if $r;
@@ -195,7 +195,6 @@ sub incoming {
 			use Data::Dumper;
 			for my $buf (@_) {
 				ref $buf or do { $buf = \( my $str = $buf ); warn "Passed nonreference buffer from @{[ (caller)[1,2] ]}\n"; };
-				warn Dumper $buf;
 				if ( $self->{$id}{wbuf} ) {
 					$self->{$id}{closeme} and return warn "Write ($$buf) called while connection close was enqueued at @{[ (caller)[1,2] ]}";
 					${ $self->{$id}{wbuf} } .= defined $$buf ? $$buf : return $self->{$id}{closeme} = 1;
@@ -203,6 +202,11 @@ sub incoming {
 				}
 				elsif ( !defined $$buf ) { return $self->drop($id); }
 				
+				$self->{$id}{fh} or return do {
+					warn "Lost filehandle while trying to send ".length($$buf)." data for $id";
+					$self->drop($id,"No filehandle");
+					();
+				};
 				my $w = syswrite( $self->{$id}{fh}, $$buf );
 				if ($w == length $$buf) {
 					# ok;
@@ -479,11 +483,18 @@ sub incoming {
 										$req->[3] = sub {
 											my $rbuf = shift;
 											if (defined $$rbuf) {
-												$h->push_write( $$rbuf );
+												if ($h) {
+													$h->push_write( $$rbuf );
+												}
+												else {
+													warn "Requested write '$$rbuf' on destroyed handle";
+												}
 											} else {
-												$h->destroy;
-												undef $h;
-												$self->drop($id);
+												if ($h) {
+													$h->destroy;
+													undef $h;
+												}
+												$self->drop($id) if $self;
 											}
 										};
 										$rv[1]->($h);

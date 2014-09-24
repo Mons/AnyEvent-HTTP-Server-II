@@ -19,4 +19,4 @@ no_index:
     - inc
 requires:
   AnyEvent: 5
-version: 1.9821
+version: 1.983
