@@ -6,7 +6,7 @@ AnyEvent::HTTP::Server - AnyEvent HTTP/1.1 Server
 
 =cut
 
-our $VERSION = '1.9990';
+our $VERSION = '1.9991';
 
 #use common::sense;
 #use 5.008008;
@@ -58,10 +58,28 @@ sub new {
 	my $pkg = shift;
 	my $self = bless {
 		backlog   => 1024,
-		port      => 8080,
 		read_size => 4096,
 		@_,
 	}, $pkg;
+	
+	if (exists $self->{listen}) {
+		$self->{listen} = [ $self->{listen} ] unless ref $self->{listen};
+		my %dup;
+		for (@{ $self->{listen} }) {
+			if($dup{ lc $_ }++) {
+				croak "Duplicate host $_ in listen\n";
+			}
+			my ($h,$p) = split ':',$_,2;
+			$h = '0.0.0.0' if $h eq '*';
+			$h = length ( $self->{host} ) ? $self->{host} : '0.0.0.0' unless length $h;
+			$p = length ( $self->{port} ) ? $self->{port} : 8080 unless length $p;
+			$_ = join ':',$h,$p;
+		}
+		($self->{host},$self->{port}) = split ':',$self->{listen}[0],2;
+	} else {
+		$self->{listen} = [ join(':',$self->{host},$self->{port}) ];
+	}
+
 	$self->can("handle_request")
 		and croak "It's a new version of ".__PACKAGE__.". For old version use `legacy' branch, or better make some minor patches to support new version";
 	
@@ -88,45 +106,52 @@ sub set_favicon {
 
 sub listen:method {
 	my $self = shift;
-	my $host = $self->{host};
-	my $service = $self->{port};
-	$host = $AnyEvent::PROTOCOL{ipv4} < $AnyEvent::PROTOCOL{ipv6} && AF_INET6 ? "::" : "0" unless defined $host;
 	
-	my $ipn = parse_address $host
-		or Carp::croak "$self.listen: cannot parse '$host' as host address";
-	
-	my $af = address_family $ipn;
-	
-	# win32 perl is too stupid to get this right :/
-	Carp::croak "listen/socket: address family not supported"
-		if AnyEvent::WIN32 && $af == AF_UNIX;
-	
-	socket my $fh, $af, SOCK_STREAM, 0 or Carp::croak "listen/socket: $!";
-	
-	if ($af == AF_INET || $af == AF_INET6) {
-		setsockopt $fh, SOL_SOCKET, SO_REUSEADDR, 1
-			or Carp::croak "listen/so_reuseaddr: $!"
-				unless AnyEvent::WIN32; # work around windows bug
+	for my $listen (@{ $self->{listen} }) {
+		my ($host,$service) = split ':',$listen,2;
+		$service = $self->{port} unless length $service;
+		$host = $self->{host} unless length $host;
+		$host = $AnyEvent::PROTOCOL{ipv4} < $AnyEvent::PROTOCOL{ipv6} && AF_INET6 ? "::" : "0" unless length $host;
 		
-		unless ($service =~ /^\d*$/) {
-			$service = (getservbyname $service, "tcp")[2]
-				or Carp::croak "tcp_listen: $service: service unknown"
+		my $ipn = parse_address $host
+			or Carp::croak "$self.listen: cannot parse '$host' as host address";
+		
+		my $af = address_family $ipn;
+		
+		# win32 perl is too stupid to get this right :/
+		Carp::croak "listen/socket: address family not supported"
+			if AnyEvent::WIN32 && $af == AF_UNIX;
+		
+		socket my $fh, $af, SOCK_STREAM, 0 or Carp::croak "listen/socket: $!";
+		
+		if ($af == AF_INET || $af == AF_INET6) {
+			setsockopt $fh, SOL_SOCKET, SO_REUSEADDR, 1
+				or Carp::croak "listen/so_reuseaddr: $!"
+					unless AnyEvent::WIN32; # work around windows bug
+			
+			unless ($service =~ /^\d*$/) {
+				$service = (getservbyname $service, "tcp")[2]
+					or Carp::croak "tcp_listen: $service: service unknown"
+			}
+		} elsif ($af == AF_UNIX) {
+			unlink $service;
 		}
-	} elsif ($af == AF_UNIX) {
-		unlink $service;
+		
+		bind $fh, AnyEvent::Socket::pack_sockaddr( $service, $ipn )
+			or Carp::croak "listen/bind on ".Socket::inet_ntoa($ipn).":$service: $!";
+		
+		fh_nonblocking $fh, 1;
+	
+		$self->{fh} ||= $fh; # compat
+		$self->{fhs}{fileno $fh} = $fh;
 	}
-	
-	bind $fh, AnyEvent::Socket::pack_sockaddr( $service, $ipn )
-		or Carp::croak "listen/bind: $!";
-	
-	fh_nonblocking $fh, 1;
-	
-	$self->{fh} = $fh;
 	
 	$self->prepare();
 	
-	listen $self->{fh}, $self->{backlog}
-		or Carp::croak "listen/listen: $!";
+	for ( values  %{ $self->{fhs} } ) {
+		listen $_, $self->{backlog}
+			or Carp::croak "listen/listen on ".(fileno $_).": $!";
+	}
 	
 	return wantarray ? do {
 		my ($service, $host) = AnyEvent::Socket::unpack_sockaddr( getsockname $self->{fh} );
@@ -138,23 +163,25 @@ sub prepare {}
 
 sub accept:method {
 	weaken( my $self = shift );
-	$self->{aw} = AE::io $self->{fh}, 0, sub {
-		while ($self->{fh} and (my $peer = accept my $fh, $self->{fh})) {
-			AnyEvent::Util::fh_nonblocking $fh, 1; # POSIX requires inheritance, the outside world does not
-			if ($self->{want_peer}) {
-				my ($service, $host) = AnyEvent::Socket::unpack_sockaddr $peer;
-				$self->incoming($fh, AnyEvent::Socket::format_address $host, $service);
-			} else {
-				$self->incoming($fh);
+	for my $fl ( values %{ $self->{fhs} }) {
+		$self->{aws}{ fileno $fl } = AE::io $fl, 0, sub {
+			while ($fl and (my $peer = accept my $fh, $fl)) {
+				AnyEvent::Util::fh_nonblocking $fh, 1; # POSIX requires inheritance, the outside world does not
+				if ($self->{want_peer}) {
+					my ($service, $host) = AnyEvent::Socket::unpack_sockaddr $peer;
+					$self->incoming($fh, AnyEvent::Socket::format_address $host, $service);
+				} else {
+					$self->incoming($fh);
+				}
 			}
-		}
-	};
+		};
+	}
 	return;
 }
 
 sub noaccept {
 	my $self = shift;
-	delete $self->{aw};
+	delete $self->{aws};
 }
 
 sub drop {
@@ -603,8 +630,8 @@ sub incoming {
 sub graceful {
 	my $self = shift;
 	my $cb = pop;
-	delete $self->{aw};
-	close $self->{fh};
+	delete $self->{aws};
+	close $_ for values %{ $self->{fhs} };
 	if ($self->{active_requests} == 0 or $self->{active_connections} == 0) {
 		$cb->();
 	} else {
