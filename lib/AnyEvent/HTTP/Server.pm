@@ -6,7 +6,7 @@ AnyEvent::HTTP::Server - AnyEvent HTTP/1.1 Server
 
 =cut
 
-our $VERSION = '1.9991';
+our $VERSION = '1.9992';
 
 #use common::sense;
 #use 5.008008;
@@ -139,6 +139,11 @@ sub listen:method {
 		
 		bind $fh, AnyEvent::Socket::pack_sockaddr( $service, $ipn )
 			or Carp::croak "listen/bind on ".Socket::inet_ntoa($ipn).":$service: $!";
+		
+		if ($host eq 'unix/') {
+			chmod oct('0777'), $service
+				or warn "chmod $service failed: $!";
+		}
 		
 		fh_nonblocking $fh, 1;
 	
