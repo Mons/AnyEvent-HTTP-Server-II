@@ -6,7 +6,7 @@ AnyEvent::HTTP::Server - AnyEvent HTTP/1.1 Server
 
 =cut
 
-our $VERSION = '1.9992';
+our $VERSION = '1.9993';
 
 #use common::sense;
 #use 5.008008;
@@ -59,6 +59,7 @@ sub new {
 	my $self = bless {
 		backlog   => 1024,
 		read_size => 4096,
+		max_header_size => 4096*8,
 		@_,
 	}, $pkg;
 	
@@ -273,7 +274,7 @@ sub incoming {
 		$r{rw} = AE::io $fh, 0, sub {
 			#warn "rw.io.$id (".(fileno $fh).") seq:$seq (ok:".($self ? 1:0).':'.(( $self && exists $self->{$id}) ? 1 : 0).")" if DEBUG;
 			$self and exists $self->{$id} or return;
-			while ( $self and ( $len = sysread( $fh, $buf, MAX_READ_SIZE, length $buf ) ) ) {
+			while ( $self and ( $len = sysread( $fh, $buf, MAX_READ_SIZE-length $buf, length $buf ) ) ) {
 				if ($state == 0) {
 						if (( my $i = index($buf,"\012", $ixx) ) > -1) {
 							if (substr($buf, $ixx, $ixx + $i) =~ /(\S+) \040 (\S+) \040 HTTP\/(\d+\.\d+)/xso) {
@@ -302,7 +303,7 @@ sub incoming {
 					warn "Parsing headers from pos $pos:".substr($buf,$pos) if DEBUG;
 							while () {
 								#warn "parse line >'".substr( $buf,pos($buf),index( $buf, "\012", pos($buf) )-pos($buf) )."'";
-								if( $buf =~ /\G ([^:\000-\037\040]+)[\011\040]*:[\011\040]* ([^\012\015;]+(;)?[^\012\015]*) \015?\012/sxogc ){
+								if( $buf =~ /\G ([^:\000-\037\040]++)[\011\040]*+:[\011\040]*+ ([^\012\015;]++(;)?[^\012\015]*+) \015?\012/sxogc ){
 									$lastkey = lc $1;
 									$h{ $lastkey } = exists $h{ $lastkey } ? $h{ $lastkey }.','.$2: $2;
 									#warn "Captured header $lastkey = '$2'";
@@ -310,7 +311,7 @@ sub incoming {
 										pos(my $v = $2) = $-[3] - $-[2];
 										#warn "scan ';'";
 										$h{ $lastkey . '+' . lc($1) } = ( defined $2 ? do { my $x = $2; $x =~ s{\\(.)}{$1}gs; $x } : $3 )
-											while ( $v =~ m{ \G ; \s* ([^\s=]+)\s*= (?: "((?:[^\\"]+|\\.)*)" | ([^;,\s]+) ) \s* }gcxso ); # "
+											while ( $v =~ m{ \G ; \s* ([^\s=]++)\s*= (?: "((?:[^\\"]++|\\.)*+)" | ([^;,\s]++) ) \s* }gcxso ); # "
 										$contstate = 1;
 									} else {
 										$contstate = 0;
@@ -319,7 +320,7 @@ sub incoming {
 								elsif ($buf =~ /\G[\011\040]+/sxogc) { # continuation
 									#warn "Continuation";
 									if (length $lastkey) {
-										$buf =~ /\G ([^\015\012;]*(;)?[^\015\012]*) \015?\012/sxogc or return pos($buf) = $bpos; # need more data;
+										$buf =~ /\G ([^\015\012;]*+(;)?[^\015\012]*+) \015?\012/sxogc or return pos($buf) = $bpos; # need more data;
 										$h{ $lastkey } .= ' '.$1;
 										if ( ( defined $2 or $contstate ) ) {
 											#warn "With ;";
@@ -331,7 +332,7 @@ sub incoming {
 												#warn "Rescan from $ext";
 												#warn("<$1><$2><$3>"),
 												$h{ $lastkey . '+' . lc($1) } = ( defined $2 ? do { my $x = $2; $x =~ s{\\(.)}{$1}gs; $x } : $3 )
-													while ( $h{ $lastkey } =~ m{ \G ; \s* ([^\s=]+)\s*= (?: "((?:[^\\"]+|\\.)*+)" | ([^;,\s]+) ) \s* }gcxso ); # "
+													while ( $h{ $lastkey } =~ m{ \G ; \s* ([^\s=]++)\s*= (?: "((?:[^\\"]++|\\.)*+)" | ([^;,\s]++) ) \s* }gcxso ); # "
 												$contstate = 1;
 											}
 										}
@@ -342,11 +343,14 @@ sub incoming {
 									last;
 								}
 								elsif($buf =~ /\G [^\012]* \Z/sxogc) {
+									if (length($buf) - $ixx > $self->{max_header_size}) {
+										return $self->drop($id, "Too big headers from $rhost for request <".substr($buf, $ixx, 32)."...>");
+									}
 									#warn "Need more";
 									return pos($buf) = $bpos; # need more data
 								}
 								else {
-									my ($line) = $buf =~ /\G([^\015\012]+)(?:\015?\012|\Z)/sxogc;
+									my ($line) = $buf =~ /\G([^\015\012]++)(?:\015?\012|\Z)/sxogc;
 									warn "Drop: bad header line: '$line'";
 									$self->{active_requests}--;
 									$self->drop($id, "Bad header line: '$line'"); # TBD
@@ -393,7 +397,7 @@ sub incoming {
 												multipart/form-data\s*;\s*
 												boundary\s*=\s*
 												(?:
-													"((?:[^\\"]+|\\.)*)" # " quoted entry
+													"((?:[^\\"]++|\\.)*)" # " quoted entry
 													|
 													([^;,\s]+)
 												)
@@ -434,15 +438,14 @@ sub incoming {
 													my %hd;
 													my $lk;
 													while() {
-														if( $part =~ /\G ([^:\000-\037\040]+)[\011\040]*:[\011\040]* ([^\012\015;]+(;)?[^\012\015]*) \015?\012/sxogc ){
-														#if( $part =~ /\G ([^:\000-\037\040]+)[\011\040]*:[\011\040]* ([^\012]+?)\015?\012/sxogc ) {
+														if( $part =~ /\G ([^:\000-\037\040]++)[\011\040]*+:[\011\040]*+ ([^\012\015;]++(;)?[^\012\015]*+) \015?\012/sxogc ){
 															$lk = lc $1;
 															$hd{ $lk } = exists $hd{ $lk } ? $hd{ $lk }.','.$2 : $2;
 															if ( defined $3 ) {
 																pos(my $v = $2) = $-[3] - $-[2];
 																# TODO: testme
 																$hd{ $lk . '+' . lc($1) } = ( defined $2 ? do { my $x = $2; $x =~ s{\\(.)}{$1}gs; $x } : $3 )
-																	while ( $v =~ m{ \G ; \s* ([^\s=]+)\s*= (?: "((?:[^\\"]+|\\.)*)" | ([^;,\s]+) ) \s* }gcxso ); # "
+																	while ( $v =~ m{ \G ; \s* ([^\s=]++)\s*= (?: "((?:[^\\"]++|\\.)*+)" | ([^;,\s]++) ) \s* }gcxso ); # "
 															}
 														}
 														elsif ($part =~ /\G[\011\040]+/sxogc and length $lk) { # continuation
@@ -452,7 +455,7 @@ sub incoming {
 																# Composite field. Need to reparse last field value (from ; after last ,)
 																pos($hd{ $lk }) = $ext;
 																$hd{ $lk . '+' . lc($1) } = ( defined $2 ? do { my $x = $2; $x =~ s{\\(.)}{$1}gs; $x } : $3 )
-																	while ( $hd{ $lk } =~ m{ \G ; \s* ([^\s=]+)\s*= (?: "((?:[^\\"]+|\\.)*)" | ([^;,\s]+) ) \s* }gcxso ); # "
+																	while ( $hd{ $lk } =~ m{ \G ; \s* ([^\s=]++)\s*= (?: "((?:[^\\"]++|\\.)*+)" | ([^;,\s]++) ) \s* }gcxso ); # "
 															}
 														}
 														elsif ($part =~ /\G\015?\012/sxogc) {
