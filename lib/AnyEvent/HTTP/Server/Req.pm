@@ -28,10 +28,15 @@ use overload
 }
 
 use AnyEvent::HTTP::Server::Kit;
+use AnyEvent::HTTP::Server::WS;
 use Time::HiRes qw/gettimeofday/;
+use MIME::Base64 qw(encode_base64);
+use Digest::SHA1 'sha1';
 
 	our @hdr = map { lc $_ }
-	our @hdrn  = qw(Upgrade Connection Content-Type WebSocket-Origin WebSocket-Location Sec-WebSocket-Origin Sec-Websocket-Location Sec-WebSocket-Key Sec-WebSocket-Accept Sec-WebSocket-Protocol DataServiceVersion);
+	our @hdrn  = qw(
+		Access-Control-Allow-Credentials Access-Control-Allow-Origin Access-Control-Allow-Headers
+		Upgrade Connection Content-Type WebSocket-Origin WebSocket-Location Sec-WebSocket-Origin Sec-Websocket-Location Sec-WebSocket-Key Sec-WebSocket-Accept Sec-WebSocket-Protocol DataServiceVersion);
 	our %hdr; @hdr{@hdr} = @hdrn;
 	our %hdri; @hdri{ @hdr } = 0..$#hdr;
 	our $LF = "\015\012";
@@ -118,6 +123,11 @@ use Time::HiRes qw/gettimeofday/;
 		sub path    {
 			$_[0][5] or $_[0]->uri_parse;
 			$_[0][5][2];
+		}
+		
+		sub query    {
+			$_[0][5] or $_[0]->uri_parse;
+			$_[0][5][3];
 		}
 		
 		sub params {
@@ -296,6 +306,46 @@ use Time::HiRes qw/gettimeofday/;
 			};
 		}
 		
+		sub is_websocket {
+			my $self = shift;
+			return 1 if lc($self->headers->{connection}) eq 'upgrade' and lc( $self->headers->{upgrade} ) eq 'websocket';
+			return 0;
+		}
+		
+		sub upgrade {
+			my $self = shift;
+			#my %h;$h{h} = \%h; $h{r} = $self;
+			
+			my $cb = pop;
+			my %args = @_;
+			if ( $self->headers->{'sec-websocket-version'} == 13 ) {
+				my $key = $self->headers->{'sec-websocket-key'};
+				my $origin = exists $self->headers->{'sec-websocket-origin'} ? $self->headers->{'sec-websocket-origin'} : $self->headers->{'origin'};
+				my $accept = encode_base64(sha1( $key . '258EAFA5-E914-47DA-95CA-C5AB0DC85B11' ));
+				chomp $accept;
+				$self->send_headers( 101,headers => {
+					%{ $args{headers} || {} },
+					upgrade => 'WebSocket',
+					connection => 'Upgrade',
+					'sec-websocket-accept' => $accept,
+					#'sec-websocket-protocol' => 'chat',
+				} );
+				return HANDLE => sub {
+					my $h = shift;
+					@$self = ();
+					$cb->(AnyEvent::HTTP::Server::WS->new(
+						%args,
+						h => $h,
+					));
+				};
+			}
+			else {
+				$self->reply(400, '', headers => {
+					'sec-websocket-version' => 13,
+				});
+			}
+		}
+		
 		sub send_headers {
 			my ($self,$code,%args) = @_;
 			$code ||= 200;
@@ -307,7 +357,7 @@ use Time::HiRes qw/gettimeofday/;
 				#'connection' => 'keep-alive',
 				'connection' => ( $args{headers} && $args{headers}{connection} ) ? $args{headers}{connection} : $self->connection,
 			};
-			if (!exists $h->{'content-length'}) { # TBD: and !connection->{upgrade}
+			if (!exists $h->{'content-length'} and !exists $h->{upgrade}) {
 				$h->{'transfer-encoding'} = 'chunked';
 				$self->[4]= 1;
 			}

@@ -385,6 +385,7 @@ sub incoming {
 								#	guard   => guard { $self->{active_requests}--; },
 								#);
 								#my @rv = $self->{cb}->( $req );
+								
 								my @rv = $self->{cb}->( $req = bless [ $method, $uri, \%h, $write, undef,undef,undef, \$self->{active_requests}, $self, scalar gettimeofday() ], 'AnyEvent::HTTP::Server::Req' );
 								weaken( $req->[8] );
 								#my @rv = $self->{cb}->( $req = bless [ $method, $uri, \%h, $write ], 'AnyEvent::HTTP::Server::Req' );
@@ -509,12 +510,12 @@ sub incoming {
 										}
 									}
 									elsif ($rv[0] eq 'HANDLE') {
-										#warn "creating handle ".Dumper \$buf;
 										delete $r{rw};
 										my $h = AnyEvent::Handle->new(
 											fh => $fh,
 										);
 										$h->{rbuf} = substr($buf,$pos);
+										#warn "creating handle ".Dumper $h->{rbuf};
 										$req->[3] = sub {
 											my $rbuf = shift;
 											if (defined $$rbuf) {
