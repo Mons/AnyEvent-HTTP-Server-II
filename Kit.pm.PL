@@ -97,6 +97,9 @@ while (<DATA>) {
 			,
 			(join('', map "\\x$_", unpack "(H2)*", $WARNS))x2;
 		printf "	\$^H |= 0x%x;\n\n", $HINTS;
+		for (keys %HINTS) {
+			print "	\$^H{'$_'} = ".dumper( $HINTS{$_}).";\n";
+		}
 	}
 	elsif (/^IMPORT/) {
 		print  "	# use warnings\n";
