@@ -31,6 +31,7 @@ use AnyEvent::HTTP::Server::Kit;
 use AnyEvent::HTTP::Server::WS;
 use Time::HiRes qw/gettimeofday/;
 use MIME::Base64 qw(encode_base64);
+use Scalar::Util qw(weaken);
 use Digest::SHA1 'sha1';
 
 	our @hdr = map { lc $_ }
@@ -330,13 +331,16 @@ use Digest::SHA1 'sha1';
 					'sec-websocket-accept' => $accept,
 					#'sec-websocket-protocol' => 'chat',
 				} );
+				${ $self->[REQCOUNT] }--;
 				return HANDLE => sub {
 					my $h = shift;
 					@$self = ();
-					$cb->(AnyEvent::HTTP::Server::WS->new(
+					my $ws = AnyEvent::HTTP::Server::WS->new(
 						%args,
 						h => $h,
-					));
+					);
+					weaken( $self->[SERVER]{wss}{ 0+$ws } = $ws );
+					$cb->($ws);
 				};
 			}
 			else {

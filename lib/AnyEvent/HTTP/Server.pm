@@ -542,7 +542,7 @@ sub incoming {
 										$req->reply(@rv);
 									}
 									else {
-										warn "Other rv";
+										#warn "Other rv";
 									}
 								}
 							}
@@ -636,6 +636,14 @@ sub incoming {
 		}; # io
 }
 
+sub ws_close {
+	my $self = shift;
+	for (values %{ $self->{wss} }) {
+		$_ && $_->close();
+	}
+	warn "$self->{active_requests} / $self->{active_connections}";
+}
+
 sub graceful {
 	my $self = shift;
 	my $cb = pop;
@@ -645,6 +653,7 @@ sub graceful {
 		$cb->();
 	} else {
 		$self->{graceful} = $cb;
+		$self->ws_close();
 	}
 }
 

@@ -82,7 +82,7 @@ sub setup {
 		$self or return;
 		#say "read".xd( $_[0]{rbuf} );
 		while ( my $frame = $self->parse_frame( \$_[0]{rbuf} )) {
-			p $frame;
+			#p $frame;
 			my $op = $frame->[4] || CONTINUATION;
 			if ($op == PONG) {
 				if ($self->{ping_id} == $frame->[5]) {
@@ -104,10 +104,11 @@ sub setup {
 				
 				if ( $self->{state} == OPEN ) {
 					# close was initiated by remote
-					warn "close $code $reason";
+					warn "remote close $code $reason";
 					$self->send_frame(1,0,0,0,CLOSE,$frame->[5]);
 					$self->{state} = CLOSED;
 					$self->{onclose} && delete($self->{onclose})->({ clean => 1, code => $code, reason => $reason });
+					$self or return;
 					$self->destroy;
 					return;
 				}
@@ -155,7 +156,9 @@ sub setup {
 		$self or return;
 		warn "h error: @_";
 		$self->{onerror} && delete($self->{onerror})->(0,$_[1]);
+		$self or return;
 		$self->{onclose} && delete($self->{onclose})->({ clean => 0, data => $_[1] });
+		$self or return;
 		$self->destroy;
 	});
 	$self->{pinger} = AE::timer 0,$self->{ping_interval}, sub {
@@ -379,7 +382,7 @@ sub close : method {
 sub DESTROY {
 	my $self = shift;
 	my $caller = "@{[ (caller)[1,2] ]}";
-	if ($self->{h}) {
+	if ($self->{h} and $self->{state} != CLOSED) {
 		warn "initiate close by DESTROY";
 		my $copy = bless {%$self}, 'AnyEvent::HTTP::Server::WS::CLOSING';
 		$copy->close(sub {
@@ -387,7 +390,7 @@ sub DESTROY {
 			undef $copy;
 		});
 	}
-	warn "Destroy ws $self by $caller";
+	#warn "Destroy ws $self by $caller";
 	%$self = ();
 }
 

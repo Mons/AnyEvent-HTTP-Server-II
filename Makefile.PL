@@ -7,6 +7,8 @@ WriteMakefile(
 	VERSION_FROM      => 'lib/AnyEvent/HTTP/Server.pm',
 	PREREQ_PM         => {
 		AnyEvent => 5,
+		'Digest::SHA1' => 2,
+		'JSON::XS'     => 3,
 	},
 	ABSTRACT_FROM     => 'lib/AnyEvent/HTTP/Server.pm', # retrieve abstract from module
 	AUTHOR            => 'Mons Anderson <mons@cpan.org>',
