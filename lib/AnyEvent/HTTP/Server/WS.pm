@@ -15,7 +15,7 @@ BEGIN {
 	}
 }
 
-our $JSON = JSON::XS->new->utf8;
+our $JSON = JSON::XS->new->utf8->convert_blessed;
 
 sub time64 () {
 	int( Time::HiRes::time() * 1e6 );
