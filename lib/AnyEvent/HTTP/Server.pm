@@ -6,7 +6,7 @@ AnyEvent::HTTP::Server - AnyEvent HTTP/1.1 Server
 
 =cut
 
-our $VERSION = '1.9994';
+our $VERSION = '1.9995';
 
 #use common::sense;
 #use 5.008008;
@@ -311,7 +311,7 @@ sub incoming {
 										pos(my $v = $2) = $-[3] - $-[2];
 										#warn "scan ';'";
 										$h{ $lastkey . '+' . lc($1) } = ( defined $2 ? do { my $x = $2; $x =~ s{\\(.)}{$1}gs; $x } : $3 )
-											while ( $v =~ m{ \G ; \s* ([^\s=]++)\s*= (?: "((?:[^\\"]++|\\.)*+)" | ([^;,\s]++) ) \s* }gcxso ); # "
+											while ( $v =~ m{ \G ; \s* ([^\s=]++)\s*= (?: "((?:[^\\"]++|\\.){0,4096}+)" | ([^;,\s]++) ) \s* }gcxso ); # "
 										$contstate = 1;
 									} else {
 										$contstate = 0;
@@ -332,7 +332,7 @@ sub incoming {
 												#warn "Rescan from $ext";
 												#warn("<$1><$2><$3>"),
 												$h{ $lastkey . '+' . lc($1) } = ( defined $2 ? do { my $x = $2; $x =~ s{\\(.)}{$1}gs; $x } : $3 )
-													while ( $h{ $lastkey } =~ m{ \G ; \s* ([^\s=]++)\s*= (?: "((?:[^\\"]++|\\.)*+)" | ([^;,\s]++) ) \s* }gcxso ); # "
+													while ( $h{ $lastkey } =~ m{ \G ; \s* ([^\s=]++)\s*= (?: "((?:[^\\"]++|\\.){0,4096}+)" | ([^;,\s]++) ) \s* }gcxso ); # "
 												$contstate = 1;
 											}
 										}
@@ -398,7 +398,7 @@ sub incoming {
 												multipart/form-data\s*;\s*
 												boundary\s*=\s*
 												(?:
-													"((?:[^\\"]++|\\.)*)" # " quoted entry
+													"((?:[^\\"]++|\\.){0,4096})" # " quoted entry
 													|
 													([^;,\s]+)
 												)
@@ -446,7 +446,7 @@ sub incoming {
 																pos(my $v = $2) = $-[3] - $-[2];
 																# TODO: testme
 																$hd{ $lk . '+' . lc($1) } = ( defined $2 ? do { my $x = $2; $x =~ s{\\(.)}{$1}gs; $x } : $3 )
-																	while ( $v =~ m{ \G ; \s* ([^\s=]++)\s*= (?: "((?:[^\\"]++|\\.)*+)" | ([^;,\s]++) ) \s* }gcxso ); # "
+																	while ( $v =~ m{ \G ; \s* ([^\s=]++)\s*= (?: "((?:[^\\"]++|\\.){0,4096}+)" | ([^;,\s]++) ) \s* }gcxso ); # "
 															}
 														}
 														elsif ($part =~ /\G[\011\040]+/sxogc and length $lk) { # continuation
@@ -456,7 +456,7 @@ sub incoming {
 																# Composite field. Need to reparse last field value (from ; after last ,)
 																pos($hd{ $lk }) = $ext;
 																$hd{ $lk . '+' . lc($1) } = ( defined $2 ? do { my $x = $2; $x =~ s{\\(.)}{$1}gs; $x } : $3 )
-																	while ( $hd{ $lk } =~ m{ \G ; \s* ([^\s=]++)\s*= (?: "((?:[^\\"]++|\\.)*+)" | ([^;,\s]++) ) \s* }gcxso ); # "
+																	while ( $hd{ $lk } =~ m{ \G ; \s* ([^\s=]++)\s*= (?: "((?:[^\\"]++|\\.){0,4096}+)" | ([^;,\s]++) ) \s* }gcxso ); # "
 															}
 														}
 														elsif ($part =~ /\G\015?\012/sxogc) {

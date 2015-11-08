@@ -8,7 +8,7 @@ use AnyEvent::Handle;
 use AnyEvent::HTTP::Server;
 use AnyEvent::HTTP::Server::Kit ':dumper';
 use EV;
-use Test::More tests => 156;
+use Test::More tests => 168;
 use Data::Dumper;
 $Data::Dumper::Useqq = 1;
 
@@ -37,8 +37,10 @@ test_server {
 	[["GET /test1 HTTP/1.1\nHost:localhost\nConnection:keep-alive\n\n"],                          200, { 'x-test' => 1 }, "GET:/test1:localhost" ],
 	[["GET /test2 HTTP/1.1\nHost:localhost\nConnection:keep-alive\n\n"],                          200, { 'x-test' => 2 }, "GET:/test2:localhost" ],
 	[["METHOD /test3 HTTP/1.1\nHost:localhost\nConnection:keep-alive\nContent-Length:4\n\ntest"], 400, { 'x-test' => 3 }, "METHOD:/test3:localhost" ],
+	$PARTIAL ? () : ([["GET /test4 HTTP/1.1\nHost:localhost\nConnection:keep-alive\nX-t: x; q=\"".("\\x"x33000)."\"\n\n"], 200, { 'x-test' => 4 }, "GET:/test4:localhost" ]),
 if ALL;
 
+my $bad = '\x'x33000;
 test_server {
 	my $s = shift;
 	my $r = shift;
@@ -57,6 +59,8 @@ test_server {
 	[[qq{GET /test4 HTTP/1.1\nHost:localhost\nConnection:keep-alive\nAccept:*/*;\n\t q="1 2"\n\n}],            200, { 'x-test' => 4 }, q{GET:/test4:localhost:*/*; q="1 2":1 2} ], # "
 	[["GET /test5 HTTP/1.1\nHost:localhost\nConnection:keep-alive\n\n"],                                      200, { 'x-test' => 5 }, "GET:/test5:localhost::" ],
 	[["METHOD /test6 HTTP/1.1\nHost:localhost\nConnection:keep-alive\nContent-Length:4\n\ntest"],             400, { 'x-test' => 6 }, "METHOD:/test6:localhost::" ],
+	[[qq{GET /test1 HTTP/1.1\nHost:localhost\nConnection:keep-alive\nAccept:*/*\n\t;q=123\n\n}],              200, { 'x-test' => 7 }, q{GET:/test1:localhost:*/* ;q=123:123} ], # "
+	$PARTIAL ? () : ([[qq{GET /test7 HTTP/1.1\nHost:localhost\nConnection:keep-alive\nAccept:*/*;\n\t q="$bad"\n\n}], 200, { 'x-test' => 8 }, qq{GET:/test7:localhost:*/*; q="$bad":"$bad"} ]), # "
 if ALL;
 
 test_server {

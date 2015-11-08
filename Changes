@@ -8,6 +8,9 @@ TODO: Dispatchers
 TODO: XS Enhancements
 TODO: send reply with content length and send body in chunks
 
+1.9995  Nov  8 2015
+        Fix "Complex regular subexpression recursion limit exceeded"
+
 1.95    Jan 22 2013
         Complete rewrite ;)
 
