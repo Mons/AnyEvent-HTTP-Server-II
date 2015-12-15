@@ -222,7 +222,7 @@ sub dumper_dd (@) {
 			->Useqq(1)
 			->Quotekeys(0)
 			->Dump;
-		$s =~ s/\\x{([a-f0-9]{1,4})}/chr hex $1/sge;
+		$s =~ s/\\x\{([a-f0-9]{1,4})\}/chr hex $1/sge;
 		$s;
 	};
 	goto &{ caller().'::dumper' };
