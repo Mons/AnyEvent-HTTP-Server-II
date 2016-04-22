@@ -66,6 +66,7 @@ use Digest::SHA1 'sha1';
 			SERVER    => 8,
 			TIME      => 9,
 			CTX       => 10,
+			HANDLE    => 11,
 		};
 		
 		sub connection { $_[0][2]{connection} =~ /^([^;]+)/ && lc( $1 ) }
@@ -332,16 +333,29 @@ use Digest::SHA1 'sha1';
 					#'sec-websocket-protocol' => 'chat',
 				} );
 				${ $self->[REQCOUNT] }--;
-				return HANDLE => sub {
-					my $h = shift;
-					@$self = ();
+				#if ( defined $self->[HANDLE] )
+				if ( exists $args{h} ) {
 					my $ws = AnyEvent::HTTP::Server::WS->new(
 						%args,
-						h => $h,
+						#h => $args{h},
+						#h => $self->[HANDLE]
 					);
 					weaken( $self->[SERVER]{wss}{ 0+$ws } = $ws );
+					@$self = ();
 					$cb->($ws);
-				};
+				}
+				else {
+					return HANDLE => sub {
+						my $h = shift;
+						my $ws = AnyEvent::HTTP::Server::WS->new(
+							%args,
+							h => $h,
+						);
+						weaken( $self->[SERVER]{wss}{ 0+$ws } = $ws );
+						@$self = ();
+						$cb->($ws);
+					};
+				}
 			}
 			else {
 				$self->reply(400, '', headers => {

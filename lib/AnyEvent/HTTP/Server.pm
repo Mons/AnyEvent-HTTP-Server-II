@@ -545,6 +545,35 @@ sub incoming {
 										#warn "Other rv";
 									}
 								}
+								elsif ( $req->is_websocket ) {
+									delete $r{rw};
+									my $h = AnyEvent::Handle->new(
+										fh => $fh,
+									);
+									$h->{rbuf} = substr($buf,$pos);
+									#warn "creating handle ".Dumper $h->{rbuf};
+									$req->[3] = sub {
+										my $rbuf = shift;
+										if (defined $$rbuf) {
+											if ($h) {
+												$h->push_write( $$rbuf );
+											}
+											else {
+												warn "Requested write '$$rbuf' on destroyed handle";
+											}
+										} else {
+											if ($h) {
+												$h->destroy;
+												undef $h;
+											}
+											$self->drop($id) if $self;
+										}
+									};
+									weaken($req->[11] = $h);
+									weaken($req);
+									%r = ( );
+									return;
+								}
 							}
 							weaken($req);
 							
