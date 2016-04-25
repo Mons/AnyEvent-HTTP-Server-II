@@ -332,29 +332,25 @@ use Digest::SHA1 'sha1';
 					'sec-websocket-accept' => $accept,
 					#'sec-websocket-protocol' => 'chat',
 				} );
+				
 				${ $self->[REQCOUNT] }--;
-				#if ( defined $self->[HANDLE] )
-				if ( exists $args{h} ) {
+				
+				my $create_handle = sub {
+					my $h = shift;
 					my $ws = AnyEvent::HTTP::Server::WS->new(
-						%args,
-						#h => $args{h},
-						#h => $self->[HANDLE]
+						%args, h => $h,
 					);
 					weaken( $self->[SERVER]{wss}{ 0+$ws } = $ws );
 					@$self = ();
 					$cb->($ws);
+				};
+				
+				if ( exists $args{h} ) {
+					$create_handle->($args{h});
+					return
 				}
 				else {
-					return HANDLE => sub {
-						my $h = shift;
-						my $ws = AnyEvent::HTTP::Server::WS->new(
-							%args,
-							h => $h,
-						);
-						weaken( $self->[SERVER]{wss}{ 0+$ws } = $ws );
-						@$self = ();
-						$cb->($ws);
-					};
+					return HANDLE => $create_handle
 				}
 			}
 			else {
