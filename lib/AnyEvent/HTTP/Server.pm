@@ -533,8 +533,8 @@ sub incoming {
 												$self->drop($id) if $self;
 											}
 										};
-										$rv[1]->($h);
 										weaken($req->[11] = $h);
+										$rv[1]->($h);
 										weaken($req);
 										%r = ( );
 										return;

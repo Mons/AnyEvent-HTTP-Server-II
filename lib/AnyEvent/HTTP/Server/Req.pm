@@ -335,7 +335,7 @@ use Digest::SHA1 'sha1';
 				
 				${ $self->[REQCOUNT] }--;
 				
-				my $create_handle = sub {
+				my $create_ws = sub {
 					my $h = shift;
 					my $ws = AnyEvent::HTTP::Server::WS->new(
 						%args, h => $h,
@@ -345,12 +345,12 @@ use Digest::SHA1 'sha1';
 					$cb->($ws);
 				};
 				
-				if ( exists $args{h} ) {
-					$create_handle->($args{h});
+				if ( $self->[HANDLE] ) {
+					$create_ws->($self->[HANDLE]);
 					return
 				}
 				else {
-					return HANDLE => $create_handle
+					return HANDLE => $create_ws
 				}
 			}
 			else {
