@@ -22,6 +22,7 @@ use AnyEvent::HTTP::Server::Kit;
 
 use AnyEvent;
 use AnyEvent::Socket;
+use AnyEvent::Handle;
 use Scalar::Util 'refaddr', 'weaken';
 use Errno qw(EAGAIN EINTR);
 use AnyEvent::Util qw(WSAEWOULDBLOCK guard AF_INET6 fh_nonblocking);
