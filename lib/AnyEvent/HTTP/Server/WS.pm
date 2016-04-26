@@ -116,6 +116,7 @@ sub setup {
 					# close was initiated by us
 					$self->{close_cb} && delete($self->{close_cb})->();
 					$self->{onclose} && delete($self->{onclose})->({ clean => 1, code => $code, reason => $reason });
+					$self or return;
 					$self->destroy;
 					return;
 				}
