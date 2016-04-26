@@ -122,7 +122,7 @@ if ALL;
 test_server {
 	my $s = shift;
 	my $r = shift;
-	my $replybody = "$r->[0]:$r->[2]{host}:".$r->path.':'.$r->param("query").':'.join(',',$r->param);
+	my $replybody = "$r->[0]:$r->[2]{host}:".$r->path.':'.$r->param("query").':'.join(',',sort $r->param);
 	return (
 		200,
 		$replybody

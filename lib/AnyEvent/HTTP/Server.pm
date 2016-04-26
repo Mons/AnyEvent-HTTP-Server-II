@@ -6,7 +6,7 @@ AnyEvent::HTTP::Server - AnyEvent HTTP/1.1 Server
 
 =cut
 
-our $VERSION = '1.9995';
+our $VERSION = '1.9996';
 
 #use common::sense;
 #use 5.008008;
@@ -22,6 +22,7 @@ use AnyEvent::HTTP::Server::Kit;
 
 use AnyEvent;
 use AnyEvent::Socket;
+use AnyEvent::Handle;
 use Scalar::Util 'refaddr', 'weaken';
 use Errno qw(EAGAIN EINTR);
 use AnyEvent::Util qw(WSAEWOULDBLOCK guard AF_INET6 fh_nonblocking);
@@ -533,6 +534,7 @@ sub incoming {
 												$self->drop($id) if $self;
 											}
 										};
+										weaken($req->[11] = $h);
 										$rv[1]->($h);
 										weaken($req);
 										%r = ( );
