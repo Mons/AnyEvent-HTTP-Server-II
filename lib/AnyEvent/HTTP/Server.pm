@@ -423,6 +423,8 @@ sub incoming {
 													( $idx + length($bnd) + 1 <= length($body) and substr($body,$idx+length($bnd),1) eq "\012" )
 													or
 													( $idx + length($bnd) + 2 <= length($body) and substr($body,$idx+length($bnd),2) eq "\015\012" )
+													or
+													( $idx + length($bnd) + 2 <= length($body) and substr($body,$idx+length($bnd),2) eq "\055\055" )
 												) ) {
 													#warn "have part";
 													my $part = substr($body,$idx-2,1) eq "\015" ? substr($body,0,$idx-2) : substr($body,0,$idx-1);
