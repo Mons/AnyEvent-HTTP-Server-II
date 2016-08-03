@@ -140,7 +140,7 @@ sub listen:method {
 		}
 		
 		bind $fh, AnyEvent::Socket::pack_sockaddr( $service, $ipn )
-			or Carp::croak "listen/bind on ".Socket::inet_ntoa($ipn).":$service: $!";
+			or Carp::croak "listen/bind on ".eval{Socket::inet_ntoa($ipn)}.":$service: $!";
 		
 		if ($host eq 'unix/') {
 			chmod oct('0777'), $service
