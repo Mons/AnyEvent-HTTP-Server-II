@@ -6,7 +6,7 @@ AnyEvent::HTTP::Server - AnyEvent HTTP/1.1 Server
 
 =cut
 
-our $VERSION = '1.9996';
+our $VERSION = '1.9997';
 
 #use common::sense;
 #use 5.008008;
@@ -386,7 +386,7 @@ sub incoming {
 								#	guard   => guard { $self->{active_requests}--; },
 								#);
 								#my @rv = $self->{cb}->( $req );
-								
+
 								my @rv = $self->{cb}->( $req = bless [ $method, $uri, \%h, $write, undef,undef,undef, \$self->{active_requests}, $self, scalar gettimeofday() ], 'AnyEvent::HTTP::Server::Req' );
 								weaken( $req->[8] );
 								#my @rv = $self->{cb}->( $req = bless [ $method, $uri, \%h, $write ], 'AnyEvent::HTTP::Server::Req' );

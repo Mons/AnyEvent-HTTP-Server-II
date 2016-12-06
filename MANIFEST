@@ -13,6 +13,7 @@ Changes
 Kit.pm.PL
 lib/AnyEvent/HTTP/Server.pm
 lib/AnyEvent/HTTP/Server/Req.pm
+lib/AnyEvent/HTTP/Server/WS.pm
 LICENSE
 Makefile.PL
 MANIFEST

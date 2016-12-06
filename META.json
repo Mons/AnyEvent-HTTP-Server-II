@@ -4,7 +4,7 @@
       "Mons Anderson <mons@cpan.org>"
    ],
    "dynamic_config" : 0,
-   "generated_by" : "ExtUtils::MakeMaker version 6.76, CPAN::Meta::Converter version 2.132510",
+   "generated_by" : "ExtUtils::MakeMaker version 7.04, CPAN::Meta::Converter version 2.150001",
    "license" : [
       "perl_5"
    ],
@@ -32,10 +32,12 @@
       },
       "runtime" : {
          "requires" : {
-            "AnyEvent" : "5"
+            "AnyEvent" : "5",
+            "Digest::SHA1" : "2",
+            "JSON::XS" : "3"
          }
       }
    },
    "release_status" : "stable",
-   "version" : "1.9994"
+   "version" : "1.9997"
 }

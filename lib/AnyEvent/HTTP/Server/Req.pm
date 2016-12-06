@@ -67,6 +67,7 @@ use Digest::SHA1 'sha1';
 			TIME      => 9,
 			CTX       => 10,
 			HANDLE    => 11,
+			ATTRS     => 12,
 		};
 		
 		sub connection { $_[0][2]{connection} =~ /^([^;]+)/ && lc( $1 ) }
@@ -75,8 +76,10 @@ use Digest::SHA1 'sha1';
 		sub full_uri { 'http://' . $_[0][2]{host} . $_[0][1] }
 		sub uri     { $_[0][1] }
 		sub headers { $_[0][2] }
+		sub attrs   { $_[0][ATTRS] //= {} }
 		
 		sub url_unescape($) {
+			# return undef unless defined $_[0];
 			my $string = shift;
 			$string =~ s/\+/ /sg;
 			#return $string if index($string, '%') == -1;
@@ -118,6 +121,7 @@ use Digest::SHA1 'sha1';
 					)
 				$ }xso
 			];
+			# $_[0][5][2] = url_unescape( $_[0][5][2] );
 			$_[0][6] = +{ map { my ($k,$v) = split /=/,$_,2; +( url_unescape($k) => url_unescape($v) ) } split /&/, $_[0][5][3] };
 		}
 		
@@ -374,6 +378,8 @@ use Digest::SHA1 'sha1';
 			if (!exists $h->{'content-length'} and !exists $h->{upgrade}) {
 				$h->{'transfer-encoding'} = 'chunked';
 				$self->[4]= 1;
+			} else {
+				$self->[4]= 0;
 			}
 			for (keys %$h) {
 				if (exists $hdr{lc $_}) { $good[ $hdri{lc $_} ] = $hdr{ lc $_ }.": ".$h->{$_}.$LF; }
@@ -381,8 +387,15 @@ use Digest::SHA1 'sha1';
 			}
 			defined() and $reply .= $_ for @good,@bad;
 			$reply .= $LF;
+			$h->{Status} = $code;
+			$self->attrs->{sent_headers} = $h;
 			#warn "send headers: $reply";
 			$self->[3]->( \$reply );
+			if (!$self->[4]) {
+				if ($args{clearance}) {
+					$self->[3] = undef;
+				}
+			}
 		}
 		
 		sub body {
@@ -397,24 +410,60 @@ use Digest::SHA1 'sha1';
 		
 		sub finish {
 			my $self = shift;
-			$self->[4] or die "Need to be chunked reply";
-			#warn "send body end (".$self->connection.")\n";
-			if( $self->[3] ) {
-				$self->[3]->( \("0$LF$LF")  );
-				$self->[3]->(\undef) if $self->connection eq 'close' or $self->[SERVER]{graceful};
-				delete $self->[3];
+			if ($self->[4]) {
+				#warn "send body end (".$self->connection.")\n";
+				if( $self->[3] ) {
+					$self->[3]->( \("0$LF$LF")  );
+					$self->[3]->(\undef) if $self->connection eq 'close' or $self->[SERVER]{graceful};
+					delete $self->[3];
+				}
+			}
+			elsif(defined $self->[4]) {
 				${ $self->[REQCOUNT] }--;
+				undef $self->[4];
+			}
+			else {
+				die "Need to be chunked reply";
+			}
+			if ( $self->attrs->{sent_headers} ) {
+				my $h = delete $self->attrs->{sent_headers};
+				if( $self->[8] && $self->[8]->{on_reply} ) {
+					$h->{ResponseTime} = gettimeofday() - $self->[9];
+					$self->[8]->{on_reply}->(
+						$self,
+						$h,
+					);
+				};
 			}
 		}
 
 		sub abort {
 			my $self = shift;
-			$self->[4] or die "Need to be chunked reply";
-			if( $self->[3] ) {
-				$self->[3]->( \("1$LF"));
-				$self->[3]->( \undef);
-				delete $self->[3];
+			if( $self->[4] ) {
+				if( $self->[3] ) {
+					$self->[3]->( \("1$LF"));
+					$self->[3]->( \undef);
+					delete $self->[3];
+				}			
+			}
+			elsif (defined $self->[4]) {
 				${ $self->[REQCOUNT] }--;
+				undef $self->[4];
+			}
+			else {
+				die "Need to be chunked reply";
+			}
+			if ( $self->attrs->{sent_headers} ) {
+				my $h = delete $self->attrs->{sent_headers};
+				if( $self->[8] && $self->[8]->{on_reply} ) {
+					$h->{ResponseTime} = gettimeofday() - $self->[9];
+					$h->{SentStatus} = $h->{Status};
+					$h->{Status} = "590";
+					$self->[8]->{on_reply}->(
+						$self,
+						$h,
+					);
+				};
 			}
 		}
 		
@@ -442,7 +491,11 @@ use Digest::SHA1 'sha1';
 						warn "[E] Died in request DESTROY: $@ from $caller\n";
 					}
 				};
-			};
+			}
+			elsif (defined $self->[4]) {
+				warn "[E] finish or abort was not called for ".( $self->[4] ? "chunked" : "partial" )." response";
+				$self->abort;
+			}
 			@$self = ();
 		}
 

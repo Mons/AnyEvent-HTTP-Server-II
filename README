@@ -6,12 +6,12 @@ SYNOPSIS
         my $s = AnyEvent::HTTP::Server->new(
         host => '0.0.0.0',
         port => 80,
-        cb   => sub {
-            my $req = shift;
-            return sub {
-            my ($is_last, $bodypart) = @_;
-            $r->reply(200, "<h1>Reply message</h1>", headers => { 'content-type' => 'text/html' });
-            }
+        cb => sub {
+          my $request = shift;
+          my $status  = 200;
+          my $content = "<h1>Reply message</h1>";
+          my $headers = { 'content-type' => 'text/html' };
+          $request->reply($status, $content, headers => $headers);
         }
         );
         $s->listen;
@@ -35,10 +35,131 @@ SYNOPSIS
 
         EV::loop;
 
+DESCRIPTION
+    AnyEvent::HTTP::Server is a very fast asynchronous HTTP server written
+    in perl. It has been tested in high load production environments and may
+    be considered both fast and stable.
+
+    One can easily implement own HTTP daemon with AnyEvent::HTTP::Server and
+    Daemond::Lite module, both found at <https://github.com/Mons>
+
+    This is a second verson available as AnyEvent-HTTP-Server-II. The first
+    version is now obsolette.
+
+HANDLING REQUEST
+    You can handle HTTP request by passing cb parameter to
+    AnyEvent::HTTP::Server->new() like this:
+
+      my $dispatcher = sub {
+        my $request = shift;
+        #... Request processing code goes here ...
+        1;
+      };
+
+      my $s = AnyEvent::HTTP::Server->new( host => '0.0.0.0', port => 80, cb => $dispatcher,);
+
+    $dispatcher coderef will be called in a list context and it's return
+    value should resolve to true, or request processing will be aborted by
+    AnyEvent:HTTP::Server.
+
+    One able to process POST requests by returning specially crafted hash
+    reference from cb parameter coderef ($dispatcher in out example). This
+    hash must contain the form key, holding a code reference. If
+    conetnt-encoding header is application/x-www-form-urlencoded, form
+    callback will be called.
+
+      my $post_action = sub {
+        my ( $request, $form ) = @_;
+        $request->reply(
+          200, # HTTP Status
+          "You just send long_data_param_name value of $form->{long_data_param_name}",  # Content
+          headers=> { 'content-type' =< 'text/plain'}, # Response headers
+        );
+      }
+
+      my $dispatcher = sub {
+        my $request = shift;
+
+        if ( $request->headers->{'content-type'} =~ m{^application/x-www-form-urlencoded\s*$} ) {
+          return {
+        form => sub {
+          $cb->( $request, $post_action);
+        },
+          };
+        } else {
+          # GET request processing
+        } 
+
+      };
+
+      my $s = AnyEvent::HTTP::Server->new( host => '0.0.0.0', port => 80, cb => $dispatcher,);
+
+EXPORT
+      Does not export anything
+
+SUBROUTINES/METHODS
+  new - create HTTP Server object
+      Arguments to constractor should be passed as a key=>value list, for example
+
+        my $s = AnyEvent::HTTP::Server->new(
+        host => '0.0.0.0',
+        port => 80,
+        cb   => sub {
+            my $req = shift;
+            return sub {
+            my ($is_last, $bodypart) = @_;
+            $r->reply(200, "<h1>Reply message</h1>", headers => { 'content-type' => 'text/html' });
+            }
+        }
+        );
+
+   host
+      Specify interfaces to bind a listening socket to
+      Example: host => '127.0.0.1'
+
+   port
+      Listen on this port
+      Example: port => 80
+
+   cb
+      This coderef will be called on incoming request
+      Example: cb => sub {
+        my $request = shift;
+        my $status  = 200;
+        my $content = "<h1>Reply message</h1>";
+        my $headers = { 'content-type' => 'text/html' };
+        $request->reply($status, $content, headers => $headers);
+      }
+
+      The first argument to callback will be request object (AnyEvent::HTTP::Server::Req).
+
+  listen - bind server socket to host and port, start listening for connections
+      This method has no arguments.
+
+      This method is commonly called from master process before it forks.
+
+      Errors in host and port may result in exceptions, so you probably want to eval this call.
+
+  accept - start accepting connections
+      This method has no arguments.
+
+      This method is commonly called in forked children, which serve incoming requests.
+
+  noaccept - stop accepting connections (while still listening on a socket)
+      This method has no arguments.
+
+  graceful - Stop accepting new connections and gracefully shut down the server
+      Wait until all connections will be handled and execute supplied coderef after that.
+      This method can be useful in signal handlers.
+
+  set_favicon - change default favicon.ico
+      The only argument is a scalar, containing binary representation of icon.
+      Favicon will have content type set to 'image/x-icon'
+
 RESOURCES
     *   GitHub repository
 
-        <http://github.com/Mons/AnyEvent-HTTP-Server>
+        <http://github.com/Mons/AnyEvent-HTTP-Server-II>
 
 ACKNOWLEDGEMENTS
     *   Thanks to Marc Lehmann for AnyEvent
