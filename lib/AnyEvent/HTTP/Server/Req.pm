@@ -282,6 +282,9 @@ use Digest::SHA1 'sha1';
 				else { push @bad, "\u\L$_\E: ".$h->{$_}.$LF; }
 			}
 			defined() and $reply .= $_ for @good,@bad;
+			# 2 is size of LF
+			$self->attrs->{head_size} = length($reply) + 2;
+			$self->attrs->{body_size} = length $content;
 			$reply .= $LF.$content;
 			#if (!ref $content) { $reply .= $content }
 			if( $self->[3] ) {
@@ -389,6 +392,8 @@ use Digest::SHA1 'sha1';
 			$reply .= $LF;
 			$h->{Status} = $code;
 			$self->attrs->{sent_headers} = $h;
+			$self->attrs->{head_size} = length $reply;
+			$self->attrs->{body_size} = 0;
 			#warn "send headers: $reply";
 			$self->[3]->( \$reply );
 			if (!$self->[4]) {
@@ -403,6 +408,7 @@ use Digest::SHA1 'sha1';
 			$self->[4] or die "Need to be chunked reply";
 			my $content = shift;
 			utf8::encode $content if utf8::is_utf8 $content;
+			$self->attrs->{body_size} += length $content;
 			my $length = sprintf "%x", length $content;
 			#warn "send body part $length / ".length($content)."\n";
 			$self->[3]->( \("$length$LF$content$LF") );
