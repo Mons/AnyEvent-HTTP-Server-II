@@ -6,7 +6,7 @@ AnyEvent::HTTP::Server - AnyEvent HTTP/1.1 Server
 
 =cut
 
-our $VERSION = '1.9997';
+our $VERSION = '1.9998';
 
 #use common::sense;
 #use 5.008008;
@@ -530,10 +530,17 @@ sub incoming {
 												}
 											} else {
 												if ($h) {
-													$h->destroy;
+													$h->push_shutdown;
+													$h->on_drain(sub {
+														$h->destroy;
+														undef $h;
+														$self->drop($id) if $self;
+													});
 													undef $h;
 												}
-												$self->drop($id) if $self;
+												else {
+													$self->drop($id) if $self;													
+												}
 											}
 										};
 										weaken($req->[11] = $h);
