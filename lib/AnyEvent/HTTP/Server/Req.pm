@@ -266,8 +266,28 @@ use Digest::SHA1 'sha1';
 				%{ $args{headers} || {} },
 				#'connection' => 'close',
 				'connection' => ( $args{headers} && $args{headers}{connection} ) ? $args{headers}{connection} : $self->connection,
-				'content-length' => length($content),
 			};
+			if ($self->method ne 'HEAD') {
+				if ( exists $h->{'content-length'} ) {
+					if ($h->{'content-length'} != length($content)) {
+						warn "Content-Length mismatch: replied: $h->{'content-length'}, expected: ".length($content);
+						$h->{'content-length'} = length($content);
+					}
+				} else {
+					$h->{'content-length'} = length($content);
+				}
+			} else {
+				if ( exists $h->{'content-length'} ) {
+					# keep it
+				}
+				elsif(length $content) {
+					$h->{'content-length'} = length $content;
+				}
+				else {
+					$h->{'transfer-encoding'} = 'chunked';
+				}
+				$content = '';
+			}
 			if (exists $h->{'content-type'}) {
 				if( $h->{'content-type'} !~ m{[^;]+;\s*charset\s*=}
 				and $h->{'content-type'} =~ m{(?:^(?:text/|application/(?:json|(?:x-)?javascript))|\+(?:json|xml)\b)}i) {
@@ -364,6 +384,12 @@ use Digest::SHA1 'sha1';
 			}
 		}
 		
+		sub send_100_continue {
+			my ($self,$code,%args) = @_;
+			my $reply = "HTTP/1.1 100 $http{100}$LF$LF";
+			$self->[3]->( \$reply );
+		}
+
 		sub send_headers {
 			my ($self,$code,%args) = @_;
 			$code ||= 200;
