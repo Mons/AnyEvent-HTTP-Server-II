@@ -199,7 +199,7 @@ sub test_server_close (&@) {
 					$end->();
 				});
 				$wait = AE::timer 1,0,sub {
-					fail "$name - connectoin not closed";
+					fail "$name - connection not closed";
 					$end->();
 				};
 				return;

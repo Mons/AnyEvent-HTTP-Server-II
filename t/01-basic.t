@@ -14,7 +14,11 @@ $Data::Dumper::Useqq = 1;
 
 use t::testlib;
 
-sub ALL () { 1 }
+use constant {
+	CHUNKED => 1,
+	ALL     => 1,
+};
+
 our $PARTIAL;
 
 # The tests
@@ -116,7 +120,7 @@ test_server {
 	[["GET /test1 HTTP/1.1\nHost:localhost\nConnection:keep-alive\n\n"],                          200, { 'x-test' => 1 }, "GET:/test1:localhost",'' ],
 	[["GET /test2 HTTP/1.1\nHost:localhost\nConnection:keep-alive\n\n"],                          200, { 'x-test' => 2 }, "GET:/test2:localhost",'' ],
 	[["METHOD /test3 HTTP/1.1\nHost:localhost\nConnection:keep-alive\nContent-Length:4\n\ntest"], 400, { 'x-test' => 3 }, "METHOD:/test3:localhost", '' ],
-if ALL;
+if ALL or CHUNKED;
 
 
 test_server {
