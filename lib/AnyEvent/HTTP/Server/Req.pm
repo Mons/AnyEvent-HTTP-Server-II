@@ -449,6 +449,7 @@ use Digest::SHA1 'sha1';
 					$self->[3]->(\undef) if $self->connection eq 'close' or $self->[SERVER]{graceful};
 					delete $self->[3];
 				}
+				undef $self->[4];
 			}
 			elsif(defined $self->[4]) {
 				${ $self->[REQCOUNT] }--;
@@ -476,7 +477,8 @@ use Digest::SHA1 'sha1';
 					$self->[3]->( \("1$LF"));
 					$self->[3]->( \undef);
 					delete $self->[3];
-				}			
+				}
+				undef $self->[4];
 			}
 			elsif (defined $self->[4]) {
 				${ $self->[REQCOUNT] }--;
