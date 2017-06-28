@@ -449,14 +449,15 @@ use Digest::SHA1 'sha1';
 					$self->[3]->(\undef) if $self->connection eq 'close' or $self->[SERVER]{graceful};
 					delete $self->[3];
 				}
+				undef $self->[4];
 			}
 			elsif(defined $self->[4]) {
-				${ $self->[REQCOUNT] }--;
 				undef $self->[4];
 			}
 			else {
 				die "Need to be chunked reply";
 			}
+			${ $self->[REQCOUNT] }--;
 			if ( $self->attrs->{sent_headers} ) {
 				my $h = delete $self->attrs->{sent_headers};
 				if( $self->[8] && $self->[8]->{on_reply} ) {
@@ -476,15 +477,16 @@ use Digest::SHA1 'sha1';
 					$self->[3]->( \("1$LF"));
 					$self->[3]->( \undef);
 					delete $self->[3];
-				}			
+				}
+				undef $self->[4];
 			}
 			elsif (defined $self->[4]) {
-				${ $self->[REQCOUNT] }--;
 				undef $self->[4];
 			}
 			else {
 				die "Need to be chunked reply";
 			}
+			${ $self->[REQCOUNT] }--;
 			if ( $self->attrs->{sent_headers} ) {
 				my $h = delete $self->attrs->{sent_headers};
 				if( $self->[8] && $self->[8]->{on_reply} ) {

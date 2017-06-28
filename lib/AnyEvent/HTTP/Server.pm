@@ -43,13 +43,14 @@ sub MAX_READ_SIZE () { 128 * 1024 }
 sub DEBUG () { 0 }
 
 our $LF = "\015\012";
-our $ico = Compress::Zlib::memGunzip pack "H*",
+my $ico_pk = pack "H*",
 	"1f8b08000000000000ff636060044201010620a9c090c1c2c020c6c0c0a001c4".
 	"4021a008441c0c807242dc100c03ffffff1f1418e2144c1a971836fd308c4f3f".
 	"08373434609883ac06248fac161b9b16fe47772736bfe1b29f1efa89713f363b".
 	"08d98d1ceec4b89f5cfd84dc8f4f3f480e19131306a484ffc0610630beba9e81".
 	"e1e86206860bcc10fec966289ecfc070b01d48b743d820b187cd0c707d000409".
 	"1d8c7e040000";
+our $ico = Compress::Zlib::memGunzip $ico_pk;
 
 sub start { croak "It's a new version of ".__PACKAGE__.". For old version use `legacy' branch, or better make some minor patches to support new version" };
 sub stop  { croak "It's a new version of ".__PACKAGE__.". For old version use `legacy' branch, or better make some minor patches to support new version" };
@@ -89,7 +90,7 @@ sub new {
 		open my $f, '<:raw', $self->{favicon} or die "Can't open favicon: $!";
 		local $/;
 		<$f>;
-	} : $ico );
+	} : $ico ) if !exists $self->{favicon} or $self->{favicon};
 	$self->{request} = 'AnyEvent::HTTP::Server::Req';
 	
 	return $self;
