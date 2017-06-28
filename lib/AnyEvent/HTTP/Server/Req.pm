@@ -452,12 +452,12 @@ use Digest::SHA1 'sha1';
 				undef $self->[4];
 			}
 			elsif(defined $self->[4]) {
-				${ $self->[REQCOUNT] }--;
 				undef $self->[4];
 			}
 			else {
 				die "Need to be chunked reply";
 			}
+			${ $self->[REQCOUNT] }--;
 			if ( $self->attrs->{sent_headers} ) {
 				my $h = delete $self->attrs->{sent_headers};
 				if( $self->[8] && $self->[8]->{on_reply} ) {
@@ -481,12 +481,12 @@ use Digest::SHA1 'sha1';
 				undef $self->[4];
 			}
 			elsif (defined $self->[4]) {
-				${ $self->[REQCOUNT] }--;
 				undef $self->[4];
 			}
 			else {
 				die "Need to be chunked reply";
 			}
+			${ $self->[REQCOUNT] }--;
 			if ( $self->attrs->{sent_headers} ) {
 				my $h = delete $self->attrs->{sent_headers};
 				if( $self->[8] && $self->[8]->{on_reply} ) {
