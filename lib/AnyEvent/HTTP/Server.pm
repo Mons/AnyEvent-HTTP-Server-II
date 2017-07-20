@@ -61,7 +61,7 @@ sub new {
 	my $self = bless {
 		backlog   => 1024,
 		read_size => 4096,
-		max_header_size => 4096*8,
+		max_header_size => MAX_READ_SIZE,
 		@_,
 	}, $pkg;
 	
@@ -290,7 +290,7 @@ sub incoming {
 								$self->{active_requests}++;
 								#push @{ $r{req} }, [{}];
 							} else {
-								#warn "Broken request ($i): <".substr($buf, 0, $i).">";
+								warn "Broken request ($i): <".substr($buf, 0, $i).">";# if DEBUG;
 								return $self->drop($id, "Broken request ($i): <".substr($buf, $ixx, $i).">");
 							}
 							$pos = $i+1;
@@ -346,6 +346,7 @@ sub incoming {
 								}
 								elsif($buf =~ /\G [^\012]* \Z/sxogc) {
 									if (length($buf) - $ixx > $self->{max_header_size}) {
+										warn "Too big headers from $rhost for request <".substr($buf, $ixx, 32)."...>(@{[ length $buf ]}/$pos/$ixx/$self->{max_header_size})";# if DEBUG;
 										return $self->drop($id, "Too big headers from $rhost for request <".substr($buf, $ixx, 32)."...>");
 									}
 									#warn "Need more";
