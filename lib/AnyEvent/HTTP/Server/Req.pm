@@ -506,6 +506,7 @@ use Digest::SHA1 'sha1';
 			my $caller = "@{[ (caller)[1,2] ]}";
 			#warn "Destroy req $self->[0] $self->[1] by $caller";
 			if( $self->[3] ) {
+				local $@;
 				eval {
 					if ($self->[4]) {
 						$self->abort();
