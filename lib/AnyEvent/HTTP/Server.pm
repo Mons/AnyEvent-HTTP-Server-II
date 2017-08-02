@@ -63,6 +63,10 @@ sub new {
 		read_size => 4096,
 		max_header_size => MAX_READ_SIZE,
 		@_,
+		active_connections => 0,
+		total_connections => 0,
+		active_requests => 0,
+		total_requests => 0,
 	}, $pkg;
 	
 	if (exists $self->{listen}) {
@@ -192,10 +196,20 @@ sub noaccept {
 	delete $self->{aws};
 }
 
+sub peer_info {
+	my $fh = shift;
+	my ($port, $host) = AnyEvent::Socket::unpack_sockaddr getpeername($fh);
+	return AnyEvent::Socket::format_address($host).':'.$port;
+}
+
 sub drop {
 	my ($self,$id,$err) = @_;
 	$err =~ s/\015//sg;
-	#warn "Dropping connection $id: $err (by request from @{[ (caller)[1,2] ]})";# if DEBUG or $self->{debug};
+	if ($err and $self->{debug_drop}) {
+		my $fh = $self->{$id}{fh};
+		my $remote = $fh && peer_info($fh);
+		warn "Dropping connection $id from $remote: $err  (by @{[ (caller)[1,2] ]})\n";
+	}
 	my $r = delete $self->{$id};
 	$self->{active_connections}--;
 	%{ $r } = () if $r;
@@ -212,18 +226,34 @@ sub req_wbuf_len {
 	return length ${ $self->{ $req->headers->{INTERNAL_REQUEST_ID} }{wbuf} };
 }
 
+sub badconn {
+	my ($self,$fh,$rbuf,$msg) = @_;
+	my $outbuf = (length $$rbuf > 2048) ?
+		substr($$rbuf,0,2045).'...' :
+		"$$rbuf";
+	$outbuf =~ s{(\p{C}|\\)}{ sprintf "\\%03o", ord $1 }sge;
+	my $remote = peer_info($fh);
+	my $fileno = fileno $fh;
+	warn "$msg from $remote (fd:$fileno) <$outbuf>\n";
+}
+
 sub incoming {
 	weaken( my $self = shift );
-	#warn "incoming @_";
+	# warn "incoming @_";
 	$self->{total_connections}++;
 		my ($fh,$rhost,$rport) = @_;
 		my $id = ++$self->{seq}; #refaddr $fh;
+
 		
 		my %r = ( fh => $fh, id => $id );
 		my $buf;
 		
 		$self->{ $id } = \%r;
 		$self->{active_connections}++;
+
+	warn sprintf("Accepted connection $id (fd:%s) from %s ($self->{active_connections}/$self->{total_connections}; $self->{active_requests}/$self->{total_requests})\n", fileno($_[0]),
+		$self->{want_peer} ? "$_[1]:$_[2]" : peer_info($_[0])
+	) if $self->{debug_conn};
 		
 		my $write = sub {
 			$self and exists $self->{$id} or return;
@@ -274,9 +304,10 @@ sub incoming {
 		
 		my $ixx = 0;
 		$r{rw} = AE::io $fh, 0, sub {
-			#warn "rw.io.$id (".(fileno $fh).") seq:$seq (ok:".($self ? 1:0).':'.(( $self && exists $self->{$id}) ? 1 : 0).")" if DEBUG;
+			# warn "rw.io.$id (".(fileno $fh).") seq:$seq (ok:".($self ? 1:0).':'.(( $self && exists $self->{$id}) ? 1 : 0).")";# if DEBUG;
 			$self and exists $self->{$id} or return;
 			while ( $self and ( $len = sysread( $fh, $buf, MAX_READ_SIZE-length $buf, length $buf ) ) ) {
+				# warn "rw.io.$id.rd $len ($state)";
 				if ($state == 0) {
 						if (( my $i = index($buf,"\012", $ixx) ) > -1) {
 							if (substr($buf, $ixx, $ixx + $i) =~ /(\S+) \040 (\S+) \040 HTTP\/(\d+\.\d+)/xso) {
@@ -290,14 +321,15 @@ sub incoming {
 								$self->{active_requests}++;
 								#push @{ $r{req} }, [{}];
 							} else {
-								warn "Broken request ($i): <".substr($buf, 0, $i).">";# if DEBUG;
-								return $self->drop($id, "Broken request ($i): <".substr($buf, $ixx, $i).">");
+								$self->badconn($fh,\substr($buf, $ixx, $i), "Malformed request at offset $ixx+$i");
+								return $self->drop($id, "Malformed request");
 							}
 							$pos = $i+1;
 						} else {
 							return; # need more
 						}
 				}
+				# warn "rw.io.$id.rd $len ($state) -> $pos";
 				my %h = ( INTERNAL_REQUEST_ID => $id, defined $rhost ? ( Remote => $rhost, RemotePort => $rport ) : () );
 				if ($state == 1) {
 					# headers
@@ -346,7 +378,7 @@ sub incoming {
 								}
 								elsif($buf =~ /\G [^\012]* \Z/sxogc) {
 									if (length($buf) - $ixx > $self->{max_header_size}) {
-										warn "Too big headers from $rhost for request <".substr($buf, $ixx, 32)."...>(@{[ length $buf ]}/$pos/$ixx/$self->{max_header_size})";# if DEBUG;
+										$self->badconn($fh,\substr($buf, pos($buf), $ixx), "Header overflow at offset ".$pos."+".(length($buf)-$pos));
 										return $self->drop($id, "Too big headers from $rhost for request <".substr($buf, $ixx, 32)."...>");
 									}
 									#warn "Need more";
@@ -354,9 +386,12 @@ sub incoming {
 								}
 								else {
 									my ($line) = $buf =~ /\G([^\015\012]++)(?:\015?\012|\Z)/sxogc;
-									warn "Drop: bad header line: '$line'";
 									$self->{active_requests}--;
-									$self->drop($id, "Bad header line: '$line'"); # TBD
+									$self->badconn($fh,\$line, "Bad header for <$method $uri>+{@{[ %h ]}}");
+									my $content = 'Bad request headers';
+									my $str = "HTTP/1.1 400 Bad Request${LF}Connection:close${LF}Content-Type:text/plain${LF}Content-Length:".length($content)."${LF}${LF}".$content;
+									$write->(\$str);
+									$write->(\undef);
 									return;
 								}
 							}
@@ -365,19 +400,19 @@ sub incoming {
 							$pos = pos($buf);
 							
 							$self->{total_requests}++;
-							
-							if ( $method eq "GET" and $uri =~ m{^/favicon\.ico( \Z | \? )}sox ) {
+
+							if ( $method eq "GET" and $uri =~ m{^/favicon\.ico( \Z | \? )}sox and $self->{ico}) {
+								$self->{active_requests}--;
 								$write->(\$self->{ico});
 								$write->(\undef) if lc $h{connecton} =~ /^close\b/;
-								$self->{active_requests}--;
 								$ixx = $pos + $h{'content-length'};
-							} elsif ( $method eq "GET" and $uri =~ m{^/ping( \Z | \? )}sox ) {
-								my ( $header_str, $content ) = ref $self->{ping_sub} eq 'CODE' ? $self->{ping_sub}->() : ('200 OK', 'Pong');
-								my $str = "HTTP/1.1 $header_str${LF}Connection:close${LF}Content-Type:text/plain${LF}Content-Length:".length($content)."${LF}${LF}".$content;
-								$write->(\$str);
-								$write->(\undef) if lc $h{connecton} =~ /^close\b/;
-								$self->{active_requests}--;
-								$ixx = $pos + $h{'content-length'};
+							# } elsif ( $method eq "GET" and $uri =~ m{^/ping( \Z | \? )}sox) {
+							# 	my ( $header_str, $content ) = ref $self->{ping_sub} eq 'CODE' ? $self->{ping_sub}->() : ('200 OK', 'Pong');
+							# 	my $str = "HTTP/1.1 $header_str${LF}Connection:close${LF}Content-Type:text/plain${LF}Content-Length:".length($content)."${LF}${LF}".$content;
+							# 	$write->(\$str);
+							# 	$write->(\undef) if lc $h{connecton} =~ /^close\b/;
+							# 	$self->{active_requests}--;
+							# 	$ixx = $pos + $h{'content-length'};
 							} else {
 								#warn "Create request object";
 								#$req = AnyEvent::HTTP::Server::Req->new(
@@ -541,7 +576,7 @@ sub incoming {
 													undef $h;
 												}
 												else {
-													$self->drop($id) if $self;													
+													$self->drop($id) if $self;
 												}
 											}
 										};
@@ -641,11 +676,24 @@ sub incoming {
 			} # while read
 			return unless $self and exists $self->{$id};
 			if (defined $len) {
-				$! = Errno::EPIPE; # warn "EOF from client ($len)";
+				if (length $buf == MAX_READ_SIZE) {
+					$self->badconn($fh,\$buf,"Can't read (@{[ MAX_READ_SIZE ]}), can't consume");
+					# $! = Errno::EMSGSIZE; # Errno is useless, since not calling drop
+					my $content = 'Non-consumable request';
+					my $str = "HTTP/1.1 400 Bad Request${LF}Connection:close${LF}Content-Type:text/plain${LF}Content-Length:".length($content)."${LF}${LF}".$content;
+					$self->{active_requests}--;
+					$write->(\$str);
+					$write->(\undef);
+					return;
+				}
+				else {
+					# $! = Errno::EPIPE;
+					# This is not an error, just EOF
+				}
 			} else {
 				return if $! == EAGAIN or $! == EINTR or $! == WSAEWOULDBLOCK;
 			}
-			$self->drop($id, "$!");
+			$self->drop($id, $! ? "$!" : ());
 		}; # io
 }
 

@@ -77,6 +77,17 @@ use Digest::SHA1 'sha1';
 		sub uri     { $_[0][1] }
 		sub headers { $_[0][2] }
 		sub attrs   { $_[0][ATTRS] //= {} }
+		sub server  { $_[0][SERVER] }
+
+		sub replied {
+			my $r = shift;
+			if (@_) {
+				$r->attrs->{replied} = shift;
+			}
+			else {
+				$r->attrs->{replied};
+			}
+		}
 		
 		sub url_unescape($) {
 			# return undef unless defined $_[0];
@@ -149,6 +160,7 @@ use Digest::SHA1 'sha1';
 				return keys %{ $_[0][6] };
 			}
 		}
+		our $CALLDEPTH = 1;
 		
 		sub replyjs {
 			my $self = shift;
@@ -187,6 +199,7 @@ use Digest::SHA1 'sha1';
 			$jdata =~ s{<}{\\u003c}sg;
 			$jdata =~ s{>}{\\u003e}sg;
 			$jdata = "$callback_name( $jdata );" if $callback_name;
+			local $CALLDEPTH = $CALLDEPTH + 1;
 			$self->reply( $code, $jdata, %args );
 			
 		}
@@ -195,6 +208,14 @@ use Digest::SHA1 'sha1';
 			my $self = shift;
 			my ( $code,$file,%args ) = @_;
 			$code ||=200;
+
+			if ($self->replied) {
+				warn "Double reply $code from ".join(":", (caller $CALLDEPTH)[1,2])." prev was from ".$self->replied."\n";
+				exit 255 if $self->server->{exit_on_double_reply};
+				return;
+			}
+			$self->replied(join ":", (caller $CALLDEPTH)[1,2]);
+
 			my $reply = "HTTP/1.0 $code $http{$code}$LF";
 			my $size = -s $file or $! and return warn "Can't sendfile `$file': $!";
 			open my $f, '<:raw',$file or return  warn "Can't open file `$file': $!";
@@ -239,6 +260,7 @@ use Digest::SHA1 'sha1';
 			my $location = shift;
 			my %args = @_;
 			( $args{headers} ||= {} )->{location} = $location;
+			local $CALLDEPTH = $CALLDEPTH + 1;
 			$self->reply( 302, "Moved", %args );
 		}
 		
@@ -326,6 +348,14 @@ use Digest::SHA1 'sha1';
 				#	warn "on_reply died with $@";
 				#};
 			};
+
+			if ($self->replied) {
+				warn "Double reply $code from ".join(":", (caller $CALLDEPTH)[1,2])." prev was from ".$self->replied."\n";
+				exit 255 if $self->server->{exit_on_double_reply};
+				return;
+			}
+			$self->replied(join ":", (caller $CALLDEPTH)[1,2]);
+
 			if( $self->[8] && $self->[8]->{stat_cb} ) {
 				eval {
 					$self->[8]->{stat_cb}->($self->path, $self->method, gettimeofday() - $self->[9]);
@@ -396,6 +426,14 @@ use Digest::SHA1 'sha1';
 		sub send_headers {
 			my ($self,$code,%args) = @_;
 			$code ||= 200;
+
+			if ($self->replied) {
+				warn "Double reply $code from ".join(":", (caller $CALLDEPTH)[1,2])." prev was from ".$self->replied."\n";
+				exit 255 if $self->server->{exit_on_double_reply};
+				return;
+			}
+			$self->replied(join ":", (caller $CALLDEPTH)[1,2]);
+
 			my $reply = "HTTP/1.1 $code $http{$code}$LF";
 			my @good;my @bad;
 			my $h = {
