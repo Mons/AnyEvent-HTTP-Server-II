@@ -309,8 +309,9 @@ sub incoming {
 			while ( $self and ( $len = sysread( $fh, $buf, MAX_READ_SIZE-length $buf, length $buf ) ) ) {
 				# warn "rw.io.$id.rd $len ($state)";
 				if ($state == 0) {
+						AGAIN:
 						if (( my $i = index($buf,"\012", $ixx) ) > -1) {
-							if (substr($buf, $ixx, $ixx + $i) =~ /(\S+) \040 (\S+) \040 HTTP\/(\d+\.\d+)/xso) {
+							if (substr($buf, $ixx, $i-$ixx) =~ /(\S+) \040 (\S+) \040 HTTP\/(\d+\.\d+)/xso) {
 								$method  = $1;
 								$uri     = $2;
 								$version = $3;
@@ -320,8 +321,14 @@ sub incoming {
 								warn "Received request N.$seq over ".fileno($fh).": $method $uri" if DEBUG;
 								$self->{active_requests}++;
 								#push @{ $r{req} }, [{}];
-							} else {
-								$self->badconn($fh,\substr($buf, $ixx, $i), "Malformed request at offset $ixx+$i");
+							}
+							elsif(substr($buf, $ixx, $i-$ixx) =~ /^\015?$/ms) {
+								# warn "Empty line";
+								$ixx = $i+1;
+								goto AGAIN;
+							}
+							else {
+								$self->badconn($fh,\substr($buf, $ixx, $i-$ixx), "Malformed request at offset $ixx+".($i-$ixx));
 								return $self->drop($id, "Malformed request");
 							}
 							$pos = $i+1;
