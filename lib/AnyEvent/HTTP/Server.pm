@@ -60,7 +60,7 @@ sub new {
 	my $self = bless {
 		backlog   => 1024,
 		read_size => 4096,
-		max_header_size => 4096*8,
+		max_header_size => MAX_READ_SIZE, #4096*8,
 		@_,
 	}, $pkg;
 	
