@@ -6,7 +6,9 @@ AnyEvent::HTTP::Server - AnyEvent HTTP/1.1 Server
 
 =cut
 
+BEGIN{
 our $VERSION = '1.9999';
+}
 
 #use common::sense;
 #use 5.008008;
@@ -61,8 +63,12 @@ sub new {
 		backlog   => 1024,
 		read_size => 4096,
 		max_header_size => MAX_READ_SIZE, #4096*8,
+		request   => 'AnyEvent::HTTP::Server::Req',
 		@_,
 	}, $pkg;
+
+	eval qq{ use $self->{request}; 1}
+		or die "Request $self->{request} not loaded: $@";
 	
 	if (exists $self->{listen}) {
 		$self->{listen} = [ $self->{listen} ] unless ref $self->{listen};
@@ -90,7 +96,6 @@ sub new {
 		local $/;
 		<$f>;
 	} : $ico ) if !exists $self->{favicon} or $self->{favicon};
-	$self->{request} = 'AnyEvent::HTTP::Server::Req';
 	
 	return $self;
 }
@@ -385,6 +390,7 @@ sub incoming {
 									writer   => $write,
 									reqcount => \$self->{active_requests},
 									server   => $self,
+									version  => $version,
 									# guard   => guard { $self->{active_requests}--; },
 								);
 								my @rv = $self->{cb}->($req);

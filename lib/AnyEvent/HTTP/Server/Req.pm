@@ -10,8 +10,6 @@ Version 1.97
 
 =cut
 
-our $VERSION = '1.97';
-
 {
 package #hide
 	aehts::sv;
@@ -26,6 +24,7 @@ use overload
 	fallback => 1;
 }
 
+use AnyEvent::HTTP::Server;
 use AnyEvent::HTTP::Server::Kit;
 use AnyEvent::HTTP::Server::WS;
 use Carp ();
@@ -34,10 +33,14 @@ use MIME::Base64 qw(encode_base64);
 use Scalar::Util qw(weaken);
 use Digest::SHA1 'sha1';
 
+	our $Server = 'AEHTS/'.$AnyEvent::HTTP::Server::VERSION;
 	our @hdr = map { lc $_ }
 	our @hdrn  = qw(
 		Access-Control-Allow-Credentials Access-Control-Allow-Origin Access-Control-Allow-Headers
-		Upgrade Connection Content-Type WebSocket-Origin WebSocket-Location Sec-WebSocket-Origin Sec-Websocket-Location Sec-WebSocket-Key Sec-WebSocket-Accept Sec-WebSocket-Protocol DataServiceVersion);
+		Upgrade Connection Content-Type Content-Length WebSocket-Origin WebSocket-Location Sec-WebSocket-Origin Sec-Websocket-Location Sec-WebSocket-Key Sec-WebSocket-Accept Sec-WebSocket-Protocol DataServiceVersion
+		Server
+		X-Req-Id
+	);
 	our %hdr; @hdr{@hdr} = @hdrn;
 	our %hdri; @hdri{ @hdr } = 0..$#hdr;
 	our $LF = "\015\012";
@@ -113,7 +116,7 @@ use Digest::SHA1 'sha1';
 				writer handle
 			)],
 			getters => [qw(
-				path query params
+				path query params version
 			)],
 		;
 
@@ -145,7 +148,10 @@ use Digest::SHA1 'sha1';
 			return bless \%args, $class;
 		}
 
-		sub connection { $_[0]{headers}{connection} =~ /^([^;]+)/ && lc( $1 ) }
+		sub connection {
+			$_[0]{headers}{connection} =~ /^([^;]+)/ && lc( $1 ) ||
+			$_[0]{version} >= 1.1 ? 'keep-alive' : 'close'
+		}
 		
 		sub full_uri { 'http://' . $_[0]{headers}{host} . $_[0]{uri} }
 		sub attrs   { $_[0]{_} //= {} }
@@ -242,7 +248,7 @@ use Digest::SHA1 'sha1';
 			
 			my @good;my @bad;
 			my $h = {
-				server           => 'aehts-'.$AnyEvent::HTTP::Server::VERSION,
+				server           => $Server,
 				%{ $args{headers} || {} },
 				'connection' => ( $args{headers} && $args{headers}{connection} ) ? $args{headers}{connection} : $self->connection,
 				'content-length' => $size,
@@ -299,11 +305,10 @@ use Digest::SHA1 'sha1';
 			#} else {
 				utf8::encode $content if utf8::is_utf8 $content;
 			#}
-			my $reply = "HTTP/1.0 $code $http{$code}$LF";
+			my $reply = "HTTP/$self->{version} $code $http{$code}$LF";
 			my @good;my @bad;
 			my $h = {
-				server           => 'aehts-'.$AnyEvent::HTTP::Server::VERSION,
-				#'content-type+charset' => 'UTF-8';
+				server           => $Server,
 				%{ $args{headers} || {} },
 				#'connection' => 'close',
 				'connection' => ( $args{headers} && $args{headers}{connection} ) ? $args{headers}{connection} : $self->connection,
