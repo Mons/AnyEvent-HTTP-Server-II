@@ -150,7 +150,7 @@ use Digest::SHA1 'sha1';
 
 		sub connection {
 			$_[0]{headers}{connection} =~ /^([^;]+)/ && lc( $1 ) ||
-			$_[0]{version} >= 1.1 ? 'keep-alive' : 'close'
+			( $_[0]{version} >= 1.1 ? 'keep-alive' : 'close' )
 		}
 		
 		sub full_uri { 'http://' . $_[0]{headers}{host} . $_[0]{uri} }
