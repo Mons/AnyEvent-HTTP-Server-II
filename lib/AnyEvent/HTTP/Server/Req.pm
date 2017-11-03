@@ -362,7 +362,6 @@ use Digest::SHA1 'sha1';
 									push @c, "path=" . $p;
 									push @c, "Secure"  if $o->{secure};
 									push @c, "HttpOnly"  if $o->{httponly};
-									my $c = join('; ',@c);
 									push @bad, "\u\Lset-cookie\E: ". join('; ',@c) .$LF;
 								}
 							}

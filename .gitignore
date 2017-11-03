@@ -15,3 +15,5 @@ pod2htm*.tmp
 AnyEvent-HTTP-Server-*
 tmp/root*
 *debug.log*
+*.swp
+*.swo

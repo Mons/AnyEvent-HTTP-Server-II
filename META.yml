@@ -20,5 +20,6 @@ no_index:
 requires:
   AnyEvent: '5'
   Digest::SHA1: '2'
+  HTTP::Easy: '0.03'
   JSON::XS: '3'
 version: '1.9999'
