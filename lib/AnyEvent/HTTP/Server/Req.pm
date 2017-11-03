@@ -29,6 +29,9 @@ use AnyEvent::HTTP::Server::Kit;
 use AnyEvent::HTTP::Server::WS;
 use Carp ();
 
+use HTTP::Easy::Cookies;
+use POSIX qw(strftime);
+
 use MIME::Base64 qw(encode_base64);
 use Scalar::Util qw(weaken);
 use Digest::SHA1 'sha1';
@@ -345,7 +348,29 @@ use Digest::SHA1 'sha1';
 			my $nh = delete $h->{NotHandled};
 			for (keys %$h) {
 				if (exists $hdr{lc $_}) { $good[ $hdri{lc $_} ] = $hdr{ lc $_ }.": ".$h->{$_}.$LF; }
-				else { push @bad, "\u\L$_\E: ".$h->{$_}.$LF; }
+				else {
+					if (lc $_ eq 'set-cookie' ) {
+						my $cookies = HTTP::Easy::Cookies->decode($h->{$_});
+						for my $d (keys %$cookies) {
+							next if $d eq 'version';
+							for my $p (keys %{$cookies->{$d}}) {
+								for my $n (keys %{$cookies->{$d}{$p}}) {
+									my $o = $cookies->{$d}{$p}{$n};
+									my @c = $n . '=' . $o->{value};
+									push @c, "expires=" . strftime('%a, %d %b %Y %T GMT', gmtime($o->{expires})) if $o->{expires};
+									push @c, "domain=". $d;
+									push @c, "path=" . $p;
+									push @c, "Secure"  if $o->{secure};
+									push @c, "HttpOnly"  if $o->{httponly};
+									my $c = join('; ',@c);
+									push @bad, "\u\Lset-cookie\E: ". join('; ',@c) .$LF;
+								}
+							}
+						}
+					} else {
+						push @bad, "\u\L$_\E: ".$h->{$_}.$LF;
+					}
+				}
 			}
 			defined() and $reply .= $_ for @good,@bad;
 			# 2 is size of LF
