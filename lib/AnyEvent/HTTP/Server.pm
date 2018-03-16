@@ -91,11 +91,17 @@ sub new {
 	$self->can("handle_request")
 		and croak "It's a new version of ".__PACKAGE__.". For old version use `legacy' branch, or better make some minor patches to support new version";
 	
-	$self->set_favicon( exists $self->{favicon} ? do {
-		open my $f, '<:raw', $self->{favicon} or die "Can't open favicon: $!";
-		local $/;
-		<$f>;
-	} : $ico ) if !exists $self->{favicon} or $self->{favicon};
+	if (!exists $self->{favicon}) {
+		$self->{favicon} = \$ico;
+	};
+	if (!ref $self->{favicon}) {
+		$self->{favicon} = \do {
+			open my $f, '<:raw', $self->{favicon} or die "Can't open favicon: $!";
+			local $/;
+			<$f>;
+		};
+	}
+	$self->set_favicon( ${ $self->{favicon} } );
 	
 	return $self;
 }
@@ -107,8 +113,13 @@ sub DESTROY { $_[0]->destroy };
 
 sub set_favicon {
 	my $self = shift;
-	my $icondata = shift;
-	$self->{ico} = "HTTP/1.1 200 OK${LF}Connection:close${LF}Content-Type:image/x-icon${LF}Content-Length:".length($icondata)."${LF}${LF}".$icondata;
+	if (shift) {
+		my $icondata = shift;
+		$self->{ico} = "HTTP/1.1 200 OK${LF}Connection:close${LF}Content-Type:image/x-icon${LF}Content-Length:".length($icondata)."${LF}${LF}".$icondata;
+	}
+	else {
+		delete $self->{ico};
+	}
 }
 
 sub listen:method {
@@ -369,19 +380,21 @@ sub incoming {
 							
 							$self->{total_requests}++;
 							
-							if ( $method eq "GET" and $uri =~ m{^/favicon\.ico( \Z | \? )}sox ) {
+							if ( $self->{ico} and $method eq "GET" and $uri =~ m{^/favicon\.ico( \Z | \? )}sox ) {
 								$write->(\$self->{ico});
 								$write->(\undef) if lc $h{connecton} =~ /^close\b/;
 								$self->{active_requests}--;
 								$ixx = $pos + $h{'content-length'};
-							} elsif ( $method eq "GET" and $uri =~ m{^/ping( \Z | \? )}sox ) {
+							}
+							elsif ( $self->{ping} and $method eq "GET" and $uri =~ m{^/ping( \Z | \? )}sox ) {
 								my ( $header_str, $content ) = ref $self->{ping_sub} eq 'CODE' ? $self->{ping_sub}->() : ('200 OK', 'Pong');
 								my $str = "HTTP/1.1 $header_str${LF}Connection:close${LF}Content-Type:text/plain${LF}Content-Length:".length($content)."${LF}${LF}".$content;
 								$write->(\$str);
 								$write->(\undef) if lc $h{connecton} =~ /^close\b/;
 								$self->{active_requests}--;
 								$ixx = $pos + $h{'content-length'};
-							} else {
+							}
+							else {
 								#warn "Create request object";
 								$req = $self->{request}->new(
 									method   => $method,
