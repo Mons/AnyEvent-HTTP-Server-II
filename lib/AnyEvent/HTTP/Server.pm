@@ -113,8 +113,8 @@ sub DESTROY { $_[0]->destroy };
 
 sub set_favicon {
 	my $self = shift;
-	if (shift) {
-		my $icondata = shift;
+	my $icondata = shift;
+	if ($icondata) {
 		$self->{ico} = "HTTP/1.1 200 OK${LF}Connection:close${LF}Content-Type:image/x-icon${LF}Content-Length:".length($icondata)."${LF}${LF}".$icondata;
 	}
 	else {
