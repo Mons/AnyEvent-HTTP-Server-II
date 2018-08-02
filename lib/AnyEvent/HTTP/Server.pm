@@ -64,6 +64,7 @@ sub new {
 		read_size => 4096,
 		max_header_size => MAX_READ_SIZE, #4096*8,
 		request   => 'AnyEvent::HTTP::Server::Req',
+		sockets => {},
 		@_,
 	}, $pkg;
 
@@ -126,48 +127,59 @@ sub listen:method {
 	my $self = shift;
 	
 	for my $listen (@{ $self->{listen} }) {
-		my ($host,$service) = split ':',$listen,2;
-		$service = $self->{port} unless length $service;
-		$host = $self->{host} unless length $host;
-		$host = $AnyEvent::PROTOCOL{ipv4} < $AnyEvent::PROTOCOL{ipv6} && AF_INET6 ? "::" : "0" unless length $host;
-		
-		my $ipn = parse_address $host
-			or Carp::croak "$self.listen: cannot parse '$host' as host address";
-		
-		my $af = address_family $ipn;
-		
-		# win32 perl is too stupid to get this right :/
-		Carp::croak "listen/socket: address family not supported"
-			if AnyEvent::WIN32 && $af == AF_UNIX;
-		
-		socket my $fh, $af, SOCK_STREAM, 0 or Carp::croak "listen/socket: $!";
-		
-		if ($af == AF_INET || $af == AF_INET6) {
-			setsockopt $fh, SOL_SOCKET, SO_REUSEADDR, 1
-				or Carp::croak "listen/so_reuseaddr: $!"
-					unless AnyEvent::WIN32; # work around windows bug
+		my $fh;
+		unless ($self->{sockets}->{$listen}) {
+			my ($host,$service) = split ':',$listen,2;
+			$service = $self->{port} unless length $service;
+			$host = $self->{host} unless length $host;
+			$host = $AnyEvent::PROTOCOL{ipv4} < $AnyEvent::PROTOCOL{ipv6} && AF_INET6 ? "::" : "0" unless length $host;
 			
-			unless ($service =~ /^\d*$/) {
-				$service = (getservbyname $service, "tcp")[2]
-					or Carp::croak "tcp_listen: $service: service unknown"
+			my $ipn = parse_address $host
+				or Carp::croak "$self.listen: cannot parse '$host' as host address";
+			
+			my $af = address_family $ipn;
+			
+			# win32 perl is too stupid to get this right :/
+			Carp::croak "listen/socket: address family not supported"
+				if AnyEvent::WIN32 && $af == AF_UNIX;
+			
+			socket $fh, $af, SOCK_STREAM, 0 or Carp::croak "listen/socket: $!";
+			
+			if ($af == AF_INET || $af == AF_INET6) {
+				setsockopt $fh, SOL_SOCKET, SO_REUSEADDR, 1
+					or Carp::croak "listen/so_reuseaddr: $!"
+						unless AnyEvent::WIN32; # work around windows bug
+				
+				unless ($service =~ /^\d*$/) {
+					$service = (getservbyname $service, "tcp")[2]
+						or Carp::croak "tcp_listen: $service: service unknown"
+				}
+			} elsif ($af == AF_UNIX) {
+				unlink $service;
 			}
-		} elsif ($af == AF_UNIX) {
-			unlink $service;
-		}
-		
-		bind $fh, AnyEvent::Socket::pack_sockaddr( $service, $ipn )
-			or Carp::croak "listen/bind on ".eval{Socket::inet_ntoa($ipn)}.":$service: $!";
-		
-		if ($host eq 'unix/') {
-			chmod oct('0777'), $service
-				or warn "chmod $service failed: $!";
+			
+			bind $fh, AnyEvent::Socket::pack_sockaddr( $service, $ipn )
+				or Carp::croak "listen/bind on ".eval{Socket::inet_ntoa($ipn)}.":$service: $!";
+			
+			if ($host eq 'unix/') {
+				chmod oct('0777'), $service
+					or warn "chmod $service failed: $!";
+			}
+		} else {
+			$fh = delete $self->{sockets}->{$listen};
 		}
 		
 		fh_nonblocking $fh, 1;
 	
 		$self->{fh} ||= $fh; # compat
 		$self->{fhs}{fileno $fh} = $fh;
+		$self->{fhs_named}{$listen} = $fh;
 	}
+	
+	for my $socket (values $self->{sockets}) {
+		close $socket;
+	}
+	$self->{sockets} = {};
 	
 	$self->prepare();
 	
