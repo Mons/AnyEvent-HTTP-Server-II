@@ -34,8 +34,16 @@ use POSIX qw(strftime);
 
 use MIME::Base64 qw(encode_base64);
 use Scalar::Util qw(weaken);
-use Digest::SHA1 'sha1';
 
+BEGIN {
+	if(eval{ require Digest::SHA1 }) {
+		Digest::SHA1->import('sha1');
+	} elsif(eval { require Digest::SHA }) {
+		Digest::SHA->import('sha1');
+	} else {
+		die 'need Digest::SHA1 or Digest::SHA';
+	}
+}
 	our $Server = 'AEHTS/'.$AnyEvent::HTTP::Server::VERSION;
 	our @hdr = map { lc $_ }
 	our @hdrn  = qw(
