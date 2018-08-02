@@ -94,7 +94,7 @@ sub new {
 	if (!exists $self->{favicon}) {
 		$self->{favicon} = \$ico;
 	};
-	if (!ref $self->{favicon}) {
+	if ($self->{favicon} and !ref $self->{favicon}) {
 		$self->{favicon} = \do {
 			open my $f, '<:raw', $self->{favicon} or die "Can't open favicon: $!";
 			local $/;
