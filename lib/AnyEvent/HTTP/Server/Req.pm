@@ -354,6 +354,15 @@ BEGIN {
 				$h->{'content-type'} = 'text/html; charset=utf-8';
 			}
 			my $nh = delete $h->{NotHandled};
+
+			# set multiple cookies
+			if(ref $h->{'set-cookie'} eq 'ARRAY') {
+				my $cookies = delete $h->{'set-cookie'};
+
+				#set-cookie is not in @hdr
+				push(@bad, "Set-Cookie: ".$_.$LF) for(@{$cookies});
+			}
+
 			for (keys %$h) {
 				if (exists $hdr{lc $_}) { $good[ $hdri{lc $_} ] = $hdr{ lc $_ }.": ".$h->{$_}.$LF; }
 				else {
