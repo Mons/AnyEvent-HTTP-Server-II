@@ -540,6 +540,11 @@ BEGIN {
 			}
 			elsif(defined $self->{chunked}) {
 				${ $self->{reqcount} }--;
+				# warn "sent body with non-chunked (wr=$self->{writer}) (".$self->connection.")\n";
+				if( $self->{writer} ) {
+					$self->{writer}->(\undef) if $self->connection eq 'close' or $self->server->{graceful};
+					delete $self->{writer};
+				}
 				undef $self->{chunked};
 			}
 			else {

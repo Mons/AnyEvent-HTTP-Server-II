@@ -223,7 +223,7 @@ sub drop {
 	my ($self,$id,$err) = @_;
 	$err =~ s/\015//sg;
 	#warn "Dropping connection $id: $err (by request from @{[ (caller)[1,2] ]})";# if DEBUG or $self->{debug};
-	my $r = delete $self->{$id};
+	my $r = delete $self->{$id} or return;
 	$self->{active_connections}--;
 	%{ $r } = () if $r;
 	
@@ -564,17 +564,16 @@ sub incoming {
 													$h->on_drain(sub {
 														$h->destroy;
 														undef $h;
-														$self->drop($id) if $self;
 													});
 													undef $h;
-												}
-												else {
-													$self->drop($id) if $self;
 												}
 											}
 										});
 										$req->handle($h);
 										$rv[1]->($h);
+										$h->{__cnn_drop_guard} = guard {
+											$self->drop($id) if $self;
+										};
 										weaken($req);
 										%r = ( );
 										return;
