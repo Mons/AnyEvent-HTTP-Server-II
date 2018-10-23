@@ -288,7 +288,6 @@ BEGIN {
 				}
 				$self->{writer}->( \undef ) if $h->{connection} eq 'close' or $self->server->{graceful};
 				delete $self->{writer};
-				${ $self->{reqcount} }--;
 			}
 		}
 		
@@ -398,7 +397,6 @@ BEGIN {
 				$self->{writer}->( \$reply );
 				$self->{writer}->( \undef ) if $h->{connection} eq 'close' or $self->server->{graceful};
 				delete $self->{writer};
-				${ $self->{reqcount} }--;
 			}
 			if( $self->server && $self->server->{on_reply} ) {
 				$h->{ResponseTime} = AE::now() - $self->reqtime;
@@ -448,14 +446,18 @@ BEGIN {
 				} );
 				
 				${ $self->{reqcount} }--;
+				$self->{reqcount} = undef;
 				
 				my $create_ws = sub {
 					my $h = shift;
 					my $ws = AnyEvent::HTTP::Server::WS->new(
-						%args, h => $h,
+						%args,
+						h => $h,
+						server => $self->server,
 					);
 					weaken( $self->server->{wss}{ 0+$ws } = $ws );
-					@$self = ();
+					
+					%$self = ();
 					$cb->($ws);
 				};
 				
@@ -539,7 +541,6 @@ BEGIN {
 				undef $self->{chunked};
 			}
 			elsif(defined $self->{chunked}) {
-				${ $self->{reqcount} }--;
 				# warn "sent body with non-chunked (wr=$self->{writer}) (".$self->connection.")\n";
 				if( $self->{writer} ) {
 					$self->{writer}->(\undef) if $self->connection eq 'close' or $self->server->{graceful};
@@ -572,7 +573,6 @@ BEGIN {
 				}
 			}
 			elsif (defined $self->{chunked}) {
-				${ $self->{reqcount} }--;
 				undef $self->{chunked};
 			}
 			else {
@@ -623,6 +623,9 @@ BEGIN {
 			elsif (defined $self->{chunked}) {
 				warn "[E] finish or abort was not called for ".( $self->{chunked} ? "chunked" : "partial" )." response";
 				$self->abort;
+			}
+			if ($self->{reqcount}) {
+				${ $self->{reqcount} }--;
 			}
 			%$self = ();
 		}

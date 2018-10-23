@@ -66,6 +66,8 @@ sub new {
 		request   => 'AnyEvent::HTTP::Server::Req',
 		sockets => {},
 		@_,
+		active_requests => 0,
+		active_connections => 0,
 	}, $pkg;
 
 	eval qq{ use $self->{request}; 1}
@@ -227,8 +229,18 @@ sub drop {
 	$self->{active_connections}--;
 	%{ $r } = () if $r;
 	
-	( delete $self->{graceful} )->()
-		if $self->{graceful} and $self->{active_requests} == 0;
+	if ($self->{graceful} ) {
+		if (
+			$self->{active_requests} == 0
+			# and $self->{active_connections} == 0
+			and 0+keys %{ $self->{wss} } == 0
+		) {
+			( delete $self->{graceful} )->();
+		}
+		else {
+			warn "wait for $self->{active_requests} / @{[ 0+keys %{ $self->{wss} } ]} for graceful shutdown";
+		}
+	}
 }
 
 sub req_wbuf_len {
@@ -416,7 +428,6 @@ sub incoming {
 									reqcount => \$self->{active_requests},
 									server   => $self,
 									version  => $version,
-									# guard   => guard { $self->{active_requests}--; },
 								);
 								my @rv = $self->{cb}->($req);
 								#my @rv = $self->{cb}->( $req = bless [ $method, $uri, \%h, $write ], 'AnyEvent::HTTP::Server::Req' );
@@ -572,7 +583,11 @@ sub incoming {
 										$req->handle($h);
 										$rv[1]->($h);
 										$h->{__cnn_drop_guard} = guard {
-											$self->drop($id) if $self;
+											# use postpone to unroll destruction loop
+											# waiting for request to decrement active_resuests
+											AE::postpone {
+												$self->drop($id) if $self;
+											};
 										};
 										weaken($req);
 										%r = ( );
@@ -681,7 +696,6 @@ sub ws_close {
 	for (values %{ $self->{wss} }) {
 		$_ && $_->close();
 	}
-	warn "$self->{active_requests} / $self->{active_connections}";
 }
 
 sub graceful {
@@ -689,9 +703,17 @@ sub graceful {
 	my $cb = pop;
 	delete $self->{aws};
 	close $_ for values %{ $self->{fhs} };
-	if ($self->{active_requests} == 0 or $self->{active_connections} == 0) {
+
+	warn "Graceful shutdown: req=$self->{active_requests} / cnn=$self->{active_connections} / wss=@{[ 0+keys %{ $self->{wss} } ]}\n";# if DEBUG or $self->{debug};
+	
+	if (
+		$self->{active_requests} == 0
+		# and $self->{active_connections} == 0
+		and 0+keys %{ $self->{wss} } == 0
+	) {
 		$cb->();
-	} else {
+	}
+	else {
 		$self->{graceful} = $cb;
 		$self->ws_close();
 	}

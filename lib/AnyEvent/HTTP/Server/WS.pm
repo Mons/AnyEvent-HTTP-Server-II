@@ -392,6 +392,7 @@ sub DESTROY {
 		});
 	}
 	#warn "Destroy ws $self by $caller";
+	delete $self->{server}{wss}{ 0+$self };
 	%$self = ();
 }
 
