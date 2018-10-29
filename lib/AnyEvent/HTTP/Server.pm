@@ -7,7 +7,7 @@ AnyEvent::HTTP::Server - AnyEvent HTTP/1.1 Server
 =cut
 
 BEGIN{
-our $VERSION = '1.9999';
+our $VERSION = '1.99991';
 }
 
 #use common::sense;
