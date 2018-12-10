@@ -7,7 +7,7 @@ AnyEvent::HTTP::Server - AnyEvent HTTP/1.1 Server
 =cut
 
 BEGIN{
-our $VERSION = '1.99991';
+our $VERSION = '1.99992';
 }
 
 #use common::sense;
@@ -407,6 +407,14 @@ sub incoming {
 							if ( $self->{ico} and $method eq "GET" and $uri =~ m{^/favicon\.ico( \Z | \? )}sox ) {
 								$write->(\$self->{ico});
 								$write->(\undef) if lc $h{connecton} =~ /^close\b/;
+								$self->{active_requests}--;
+								$ixx = $pos + $h{'content-length'};
+							}
+							elsif ( $method eq 'PING' ) {
+								my ( $header_str, $content ) = ref $self->{ping_sub} eq 'CODE' ? $self->{ping_sub}->() : ('200 OK', 'Pong '.time()."\n");
+								my $str = "HTTP/1.1 $header_str${LF}Connection:close${LF}Content-Type:text/plain${LF}Content-Length:".length($content)."${LF}${LF}".$content;
+								$write->(\$str);
+								$write->(\undef);
 								$self->{active_requests}--;
 								$ixx = $pos + $h{'content-length'};
 							}
