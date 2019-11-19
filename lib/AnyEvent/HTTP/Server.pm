@@ -6,8 +6,9 @@ AnyEvent::HTTP::Server - AnyEvent HTTP/1.1 Server
 
 =cut
 
+our $VERSION;
 BEGIN{
-our $VERSION = '1.99992';
+$VERSION = '1.99993';
 }
 
 #use common::sense;
@@ -30,6 +31,7 @@ use Errno qw(EAGAIN EINTR);
 use AnyEvent::Util qw(WSAEWOULDBLOCK guard AF_INET6 fh_nonblocking);
 use Socket qw(AF_INET AF_UNIX SOCK_STREAM SOCK_DGRAM SOL_SOCKET SO_REUSEADDR IPPROTO_TCP TCP_NODELAY);
 
+use Carp ();
 use Encode ();
 use Compress::Zlib ();
 use MIME::Base64 ();
@@ -54,6 +56,16 @@ my $ico_pk = pack "H*",
 	"1d8c7e040000";
 our $ico = Compress::Zlib::memGunzip $ico_pk;
 
+our $ERROR_TEMPLATE = <<"EOD";
+<html>
+<head><title>%1\$s %2\$s</title></head>
+<body bgcolor="white">
+<center><h1>%1\$s %2\$s</h1></center>
+<hr><center>${\__PACKAGE__}/$VERSION</center>
+</body>
+</html>
+EOD
+
 sub start { croak "It's a new version of ".__PACKAGE__.". For old version use `legacy' branch, or better make some minor patches to support new version" };
 sub stop  { croak "It's a new version of ".__PACKAGE__.". For old version use `legacy' branch, or better make some minor patches to support new version" };
 
@@ -61,14 +73,18 @@ sub new {
 	my $pkg = shift;
 	my $self = bless {
 		backlog   => 1024,
-		read_size => 4096,
-		max_header_size => MAX_READ_SIZE, #4096*8,
+		read_size => MAX_READ_SIZE,
+		max_header_size => MAX_READ_SIZE,
 		request   => 'AnyEvent::HTTP::Server::Req',
 		sockets => {},
 		@_,
 		active_requests => 0,
 		active_connections => 0,
 	}, $pkg;
+	
+	if ($self->{max_header_size} > $self->{read_size}) {
+		Carp::croak "max_header_size can't be greater than read_size";
+	}
 
 	eval qq{ use $self->{request}; 1}
 		or die "Request $self->{request} not loaded: $@";
@@ -224,7 +240,7 @@ sub noaccept {
 sub drop {
 	my ($self,$id,$err) = @_;
 	$err =~ s/\015//sg;
-	#warn "Dropping connection $id: $err (by request from @{[ (caller)[1,2] ]})";# if DEBUG or $self->{debug};
+	warn "Dropping connection $id: $err (by request from @{[ (caller)[1,2] ]})" if DEBUG; # or $self->{debug};
 	my $r = delete $self->{$id} or return;
 	$self->{active_connections}--;
 	%{ $r } = () if $r;
@@ -308,6 +324,16 @@ sub incoming {
 			}
 		};
 		
+		my $reply_error = sub {
+			# my ($code,$message) = @_;
+			$_[1] //= $AnyEvent::HTTP::Server::Req::http{$_[0]};
+			# warn "ERROR @_";
+			my $body = sprintf $ERROR_TEMPLATE, $_[0], $_[1];
+			my $reply = "HTTP/1.0 $_[0] $_[1]${LF}Connection:close${LF}Content-Type:text/html${LF}Content-Length:"
+				.length($body)."${LF}${LF}".$body."\n";
+			$write->(\$reply,\undef);
+		};
+		
 		my ($state,$seq) = (0,0);
 		my ($method,$uri,$version,$lastkey,$contstate,$bpos,$len,$pos, $req);
 		
@@ -315,10 +341,10 @@ sub incoming {
 		$r{rw} = AE::io $fh, 0, sub {
 			#warn "rw.io.$id (".(fileno $fh).") seq:$seq (ok:".($self ? 1:0).':'.(( $self && exists $self->{$id}) ? 1 : 0).")" if DEBUG;
 			$self and exists $self->{$id} or return;
-			while ( $self and ( $len = sysread( $fh, $buf, MAX_READ_SIZE-length $buf, length $buf ) ) ) {
+			while ( $self and ( $len = sysread( $fh, $buf, $self->{read_size}-length $buf, length $buf ) ) ) {
 				if ($state == 0) {
 						if (( my $i = index($buf,"\012", $ixx) ) > -1) {
-							if (substr($buf, $ixx, $ixx + $i) =~ /(\S+) \040 (\S+) \040 HTTP\/(\d+\.\d+)/xso) {
+							if (substr($buf, $ixx, $i - $ixx) =~ /^(\S++) \040 (\S++) \040 HTTP\/(\d++\.\d++)\015?$/xso) {
 								$method  = $1;
 								$uri     = $2;
 								$version = $3;
@@ -328,12 +354,27 @@ sub incoming {
 								warn "Received request N.$seq over ".fileno($fh).": $method $uri" if DEBUG;
 								$self->{active_requests}++;
 								#push @{ $r{req} }, [{}];
-							} else {
-								#warn "Broken request ($i): <".substr($buf, 0, $i).">";
-								return $self->drop($id, "Broken request ($i): <".substr($buf, $ixx, $i).">");
+							}
+							elsif (substr($buf, $ixx, $i - $ixx) =~ /^\015?$/) {
+								# warn "Skip empty line";
+								$ixx = $i + 1;
+								redo;
+							}
+							else {
+								warn "Broken request ($i): <".substr($buf, $ixx, $i).">";
+								return $reply_error->(400);
+								# return $self->drop($id, "Broken request ($i): <".substr($buf, $ixx, $i).">");
 							}
 							$pos = $i+1;
 						} else {
+							if ($ixx > 0) {
+								$buf = substr($buf,$ixx);
+								$pos = $ixx = 0;
+							}
+							elsif ( length($buf) >= $self->{max_header_size} ) {
+								return $reply_error->(413);
+							}
+							warn "Need more data" if DEBUG;
 							return; # need more
 						}
 				}
@@ -344,6 +385,7 @@ sub incoming {
 					warn "Parsing headers from pos $pos:".substr($buf,$pos) if DEBUG;
 							while () {
 								#warn "parse line >'".substr( $buf,pos($buf),index( $buf, "\012", pos($buf) )-pos($buf) )."'";
+								$bpos = pos($buf);
 								if( $buf =~ /\G ([^:\000-\037\040]++)[\011\040]*+:[\011\040]*+ ([^\012\015;]*+(;)?[^\012\015]*+) \015?\012/sxogc ){
 									$lastkey = lc $1;
 									$h{ $lastkey } = exists $h{ $lastkey } ? $h{ $lastkey }.','.$2: $2;
@@ -361,14 +403,27 @@ sub incoming {
 								elsif ($buf =~ /\G[\011\040]+/sxogc) { # continuation
 									#warn "Continuation";
 									if (length $lastkey) {
-										$buf =~ /\G ([^\015\012;]*+(;)?[^\015\012]*+) \015?\012/sxogc or return pos($buf) = $bpos; # need more data;
+										unless ($buf =~ /\G ([^\015\012;]*+(;)?[^\015\012]*+) \015?\012/sxogc) {
+											if ($ixx > 0) {
+												$pos = $bpos - $ixx;
+												$buf = substr($buf,$ixx);
+												$ixx = 0;
+											}
+											elsif ( length($buf) >= $self->{max_header_size} ) {
+												$self->{active_requests}--;
+												return $reply_error->(413);
+											}
+											warn "Need more data" if DEBUG;
+											return; # need more
+										};
+										# $buf =~ /\G ([^\015\012;]*+(;)?[^\015\012]*+) \015?\012/sxogc or return pos($buf) = $bpos; # need more data;
 										$h{ $lastkey } .= ' '.$1;
 										if ( ( defined $2 or $contstate ) ) {
 											#warn "With ;";
 											if ( ( my $ext = index( $h{ $lastkey }, ';', rindex( $h{ $lastkey }, ',' ) + 1) ) > -1 ) {
 												# Composite field. Need to reparse last field value (from ; after last ,)
-											# full key rescan, because of possible case: <key:value; field="value\n\tvalue continuation"\n>
-											# regexp needed to set \G
+												# full key rescan, because of possible case: <key:value; field="value\n\tvalue continuation"\n>
+												# regexp needed to set \G
 												pos($h{ $lastkey }) = $ext;
 												#warn "Rescan from $ext";
 												#warn("<$1><$2><$3>"),
@@ -384,18 +439,24 @@ sub incoming {
 									last;
 								}
 								elsif($buf =~ /\G [^\012]* \Z/sxogc) {
-									if (length($buf) - $ixx > $self->{max_header_size}) {
-										return $self->drop($id, "Too big headers from $rhost for request <".substr($buf, $ixx, 32)."...>");
+									if ($ixx > 0) {
+										$pos = $bpos - $ixx;
+										$buf = substr($buf,$ixx);
+										$ixx = 0;
 									}
-									#warn "Need more";
-									return pos($buf) = $bpos; # need more data
+									elsif ( length($buf) >= $self->{max_header_size} ) {
+										$self->{active_requests}--;
+										return $reply_error->(413);
+									}
+									warn "Need more data" if DEBUG;
+									return; # need more
 								}
 								else {
 									my ($line) = $buf =~ /\G([^\015\012]++)(?:\015?\012|\Z)/sxogc;
 									warn "Drop: bad header line: '$line'";
 									$self->{active_requests}--;
-									$self->drop($id, "Bad header line: '$line'"); # TBD
-									return;
+									# $self->drop($id, "Bad header line: '$line'"); # TBD
+									return $reply_error->(400);
 								}
 							}
 							

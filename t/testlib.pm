@@ -21,6 +21,7 @@ sub read_response {
 	my $h = shift;
 	my $cb = pop;
 			my %h;
+			delete $h->{_skip_drain_rbuf} if $h->{_eof};
 			$h->push_read(line => sub {
 				shift;
 				diag "@_";
@@ -41,6 +42,7 @@ sub read_response {
 							#warn "no more";
 							if ( $h{ 'content-length' } ) {
 								$h->push_read(chunk => $h{ 'content-length' }, sub {
+									$h->on_error(sub { diag "Error '$_[2]' after reading response" });
 									$cb->(\%h, $_[1]);
 								});
 							}
@@ -61,6 +63,7 @@ sub read_response {
 										} else {
 											#warn dumper \@chunks;
 											$h->push_read( chunk => 2, sub {
+												$h->on_error(sub { diag "Error '$_[2]' after reading response" });
 												$cb->(\%h,@chunks);
 											});
 										}
@@ -86,19 +89,37 @@ sub send_request($@&) {
 	}
 	my $total = join '', @parts;
 	diag substr($total, 0, index($total,"\n"));
+	my $t;
+	my $send;
+	my $on_error = $h->{on_error};
+	$h->on_error(sub{
+		my $h = shift;
+		undef $send;
+		undef $t;
+		if (not length $h->{rbuf}) {
+			$h->destroy;
+			$cb->({ Error => "$_[1]" });
+			return;
+		}
+		$h->on_error($on_error);
+		read_response($h,$cb);
+	});
 	if (!$::PARTIAL) {
 		$h->push_write(join '', @parts);
+		$h->on_error($on_error);
 		read_response($h,$cb);
 		return;
 	}
-	my $send;$send = sub {
+	$send = sub {
 		if (@parts) {
 			$h->push_write(shift @parts);
-			my $t;$t = AE::timer 0.001,0,sub {
-				$send->();
+			$t = AE::timer 0.0005,0,sub {
+				return unless $send;
 				undef $t;
+				$send->();
 			};
 		} else {
+			$h->on_error($on_error);
 			read_response($h,$cb);
 		}
 	};
@@ -109,10 +130,11 @@ sub connect_handle($&) {
 	my ($port,$cb) = @_;
 	tcp_connect 0,$port, sub {
 		my $fh = shift or return warn "$!";
-		my $h = AnyEvent::Handle->new( 
+		my $h = AnyEvent::Handle->new(
 			fh => $fh,
 			on_error => sub { warn "error: @_" },
-			on_eof => sub { warn "error: @_" },
+			on_eof   => sub { warn "error: @_" },
+			on_read  => sub { 1 },
 		);
 		$cb->($h);
 	};
@@ -120,10 +142,22 @@ sub connect_handle($&) {
 
 sub test_server (&@) {
 	my $server_callback = shift;
-	my $name = ref $_[0] ? '' : ( $::PARTIAL ? 'partial' : 'complete' ).' - '.shift;
+	my ($opts,$name);
+	while (@_ and ref $_[0] ne 'ARRAY') {
+		if (ref $_[0] eq 'HASH') {
+			$opts = shift;
+		}
+		elsif (!ref $_[0]) {
+			$name = shift;
+		}
+		else {
+			Carp::croak "Bad options";
+		}
+	}
+	$name = ( $::PARTIAL ? 'partial' : 'complete' )." - $name";
 	my @tests = @_;
 	my $cv = AE::cv;
-	my $s;$s = AnyEvent::HTTP::Server->new( port => undef, cb => sub {
+	my $s;$s = AnyEvent::HTTP::Server->new( %$opts, port => undef, cb => sub {
 		$s or return;
 		my $seq = ++$s->{__seq};
 		my $r = $_[0];
@@ -148,11 +182,16 @@ sub test_server (&@) {
 				#diag explain \@_;
 				is $h->{''}[1], $rescode, "$name $idx - reply status ok";
 				is $h->{$_},$resh->{$_}, "$name $idx - reply header $_ ok" for (keys %$resh);
-				is $b,$resb.$morebody, "$name $idx - reply body ok" or diag explain $h,$b, do {
-					$Data::Dumper::Useqq=1;
-					diag dumper $b;
-					diag dumper $resb.$morebody;
-				};
+				if (UNIVERSAL::isa($resb, 'Regexp')) {
+					like $b,$resb, "$name $idx - reply body like ok" or diag explain $h,$b;
+				} else {
+					is $b,$resb.$morebody, "$name $idx - reply body ok" or diag explain $h,$b, do {
+						$Data::Dumper::Useqq=1;
+						diag dumper $b;
+						diag dumper $resb.$morebody;
+					};
+				}
+
 				$rq->();
 			});
 		};
@@ -163,10 +202,21 @@ sub test_server (&@) {
 
 sub test_server_close (&@) {
 	my $server_callback = shift;
-	my $name = ref $_[0] ? '' : shift;
+	my ($opts,$name);
+	while (@_ and ref $_[0] ne 'ARRAY') {
+		if (ref $_[0] eq 'HASH') {
+			$opts = shift;
+		}
+		elsif (!ref $_[0]) {
+			$name = shift;
+		}
+		else {
+			Carp::croak "Bad options";
+		}
+	}
 	my @tests = @_;
 	my $cv = AE::cv;
-	my $s;$s = AnyEvent::HTTP::Server->new( port => undef, cb => sub {
+	my $s;$s = AnyEvent::HTTP::Server->new( %$opts, port => undef, cb => sub {
 		$s or return;
 		my $seq = ++$s->{__seq};
 		my $r = $_[0];

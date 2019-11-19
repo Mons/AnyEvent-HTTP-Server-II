@@ -2,7 +2,7 @@
 
 use strict;
 use FindBin;
-use lib "$FindBin::Bin/../blib/lib";
+use lib "$FindBin::Bin/../lib", "$FindBin::Bin/../blib/lib";
 use Sys::Hostname;
 use Getopt::Long;
 use Cwd 'cwd','abs_path';
