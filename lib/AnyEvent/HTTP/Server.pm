@@ -200,8 +200,10 @@ sub prepare {}
 
 sub accept:method {
 	weaken( my $self = shift );
+	my $accept_limit = $self->{accept_limit} ? $self->{accept_limit} : 1024*16;
 	for my $fl ( values %{ $self->{fhs} }) {
 		$self->{aws}{ fileno $fl } = AE::io $fl, 0, sub {
+			my $count = 0;
 			while ($fl and (my $peer = accept my $fh, $fl)) {
 				AnyEvent::Util::fh_nonblocking $fh, 1; # POSIX requires inheritance, the outside world does not
 				if ($self->{want_peer}) {
@@ -210,6 +212,7 @@ sub accept:method {
 				} else {
 					$self->incoming($fh);
 				}
+				last if ++$count >= $accept_limit;
 			}
 		};
 	}
@@ -256,6 +259,9 @@ sub incoming {
 	#warn "incoming @_";
 	$self->{total_connections}++;
 		my ($fh,$rhost,$rport) = @_;
+		if ($self->{debug_accept}) {
+			warn "Accepted connection $rhost:$rport (fd: ".fileno($fh).")\n";
+		}
 		my $id = ++$self->{seq}; #refaddr $fh;
 		
 		my %r = ( fh => $fh, id => $id );
