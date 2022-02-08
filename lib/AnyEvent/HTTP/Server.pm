@@ -8,7 +8,7 @@ AnyEvent::HTTP::Server - AnyEvent HTTP/1.1 Server
 
 our $VERSION;
 BEGIN{
-$VERSION = '1.99993';
+$VERSION = '1.99994';
 }
 
 #use common::sense;
@@ -194,7 +194,7 @@ sub listen:method {
 		$self->{fhs_named}{$listen} = $fh;
 	}
 	
-	for my $socket (values $self->{sockets}) {
+	for my $socket (values %{ $self->{sockets} }) {
 		close $socket;
 	}
 	$self->{sockets} = {};
