@@ -34,12 +34,12 @@
          "requires" : {
             "AnyEvent" : "5",
             "Digest::SHA1" : "2",
-            "HTTP::Easy" : "0.03",
+            "HTTP::Easy" : "0.02",
             "JSON::XS" : "3"
          }
       }
    },
    "release_status" : "stable",
-   "version" : "1.99994",
+   "version" : "1.99995",
    "x_serialization_backend" : "JSON::PP version 4.06"
 }

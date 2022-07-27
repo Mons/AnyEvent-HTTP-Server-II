@@ -20,7 +20,7 @@ no_index:
 requires:
   AnyEvent: '5'
   Digest::SHA1: '2'
-  HTTP::Easy: '0.03'
+  HTTP::Easy: '0.02'
   JSON::XS: '3'
-version: '1.99994'
+version: '1.99995'
 x_serialization_backend: 'CPAN::Meta::YAML version 0.018'

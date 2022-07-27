@@ -1,15 +1,9 @@
 #!/usr/bin/env perl
 
-#use strict;
-#use uni::perl ':dumper';
-
-use AnyEvent::Socket;
-use AnyEvent::Handle;
-use AnyEvent::HTTP::Server;
-use AnyEvent::HTTP::Server::Kit ':dumper';
-use EV;
 use Test::More tests => 194;
 use Data::Dumper;
+use FindBin;
+use lib "$FindBin::Bin/..";
 $Data::Dumper::Useqq = 1;
 
 use t::testlib;
@@ -264,4 +258,3 @@ if ALL;
 }
 
 done_testing();
-

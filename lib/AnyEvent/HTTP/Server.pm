@@ -8,20 +8,10 @@ AnyEvent::HTTP::Server - AnyEvent HTTP/1.1 Server
 
 our $VERSION;
 BEGIN{
-$VERSION = '1.99994';
+$VERSION = '1.99995';
 }
 
-#use common::sense;
-#use 5.008008;
-#use strict;
-#use warnings;
-#no  warnings 'uninitialized';
-#use mro 'c3';
 use AnyEvent::HTTP::Server::Kit;
-
-#use Exporter;
-#our @ISA = qw(Exporter);
-#our @EXPORT_OK = our @EXPORT = qw(http_server);
 
 use AnyEvent;
 use AnyEvent::Socket;
@@ -36,8 +26,6 @@ use Encode ();
 use Compress::Zlib ();
 use MIME::Base64 ();
 use Time::HiRes qw/gettimeofday/;
-
-#use Carp 'croak';
 
 use AnyEvent::HTTP::Server::Req;
 
@@ -593,14 +581,8 @@ sub incoming {
 													#warn "call for part $hd{name} ($last)";
 													$cb->( $last && $idx == -1 ? 1 : 0,$part,\%hd );
 												}
-												#warn "just return";
-												#if ($last) {
-													#warn "leave with $body";
-												#}
 											};
 										}
-#										elsif ( $h{'content-type'} =~ m{^application/x-www-form-urlencoded(?:\Z|\s*;)}i and exists $rv[0]{form} ) {
-
 										elsif (  exists $rv[0]{form} ) {
 											my $body = '';
 											$r{on_body} = sub {
@@ -791,47 +773,6 @@ sub graceful {
 
 1; # End of AnyEvent::HTTP::Server
 __END__
-
-sub http_server($$&) {
-	my ($lhost,$lport,$reqcb) = @_;
-	
-	# TBD
-	
-	return $self;
-}
-
-sub __old_stop {
-	my ($self,$cb) = @_;
-	delete $self->{aw};
-	close $self->{socket};
-	if (%{$self->{con}}) {
-		$log->debugf("Server have %d active connectinos while stopping...", 0+keys %{$self->{con}});
-		my $cv = &AE::cv( $cb );
-		$cv->begin;
-		for my $key ( keys %{$self->{con}} ) {
-			my $con = $self->{con}{$key};
-			$log->debug("$key: connection from $con->{host}:$con->{port}: $con->{state}");
-			if ($con->{state} eq 'idle' or $con->{state} eq 'closed') {
-				$con->close;
-				delete $self->{con}{$key};
-				use Devel::FindRef;
-				warn "closed <$con> ".Devel::FindRef::track $con;
-			} else {
-				$cv->begin;
-				$con->{close} = sub {
-					$log->debug("Connection $con->{host}:$con->{port} was closed");
-					$cv->end;
-				};
-			}
-		}
-		if (%{$self->{con}}) {
-			$log->debug("Still have @{[ 0+keys %{$self->{con}} ]}");
-		}
-		$cv->end;
-	} else {
-		$cb->();
-	}
-}
 
 =head1 SYNOPSIS
 

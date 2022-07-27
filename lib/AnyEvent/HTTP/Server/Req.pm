@@ -304,23 +304,12 @@ BEGIN {
 			#return $self->headers(@_) if @_ % 2;
 			my ($code,$content,%args) = @_;
 			$code ||=200;
-			#if (ref $content) {
-			#	if (ref $content eq 'HASH' and $content->{sendfile}) {
-			#		$content->{size} = -s $content->{sendfile};
-			#	}
-			#	else {
-			#		croak "Unknown type of content: $content";
-			#	}
-			#	
-			#} else {
-				utf8::encode $content if utf8::is_utf8 $content;
-			#}
+			utf8::encode $content if utf8::is_utf8 $content;
 			my $reply = "HTTP/$self->{version} $code $http{$code}$LF";
 			my @good;my @bad;
 			my $h = {
 				server           => $Server,
 				%{ $args{headers} || {} },
-				#'connection' => 'close',
 				'connection' => ( $args{headers} && $args{headers}{connection} ) ? $args{headers}{connection} : $self->connection,
 			};
 			if ($self->method ne 'HEAD') {
