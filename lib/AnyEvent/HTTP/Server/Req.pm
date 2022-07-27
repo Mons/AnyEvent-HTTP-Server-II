@@ -588,6 +588,7 @@ BEGIN {
 			my $caller = "@{[ (caller)[1,2] ]}";
 			# warn "Destroy req $self->{method} $self->{uri} by $caller";
 			if( $self->{writer} ) {
+				local $@;
 				eval {
 					if ($self->{chunked}) {
 						$self->abort();
