@@ -252,7 +252,7 @@ BEGIN {
 		sub sendfile {
 			my $self = shift;
 			my ( $code,$file,%args ) = @_;
-			$code ||=200;
+			$code ||= 200;
 			my $reply = "HTTP/1.0 $code $http{$code}$LF";
 			my $size = -s $file or $! and return warn "Can't sendfile `$file': $!";
 			open my $f, '<:raw',$file or return  warn "Can't open file `$file': $!";
@@ -303,7 +303,8 @@ BEGIN {
 			my $self = shift;
 			#return $self->headers(@_) if @_ % 2;
 			my ($code,$content,%args) = @_;
-			$code ||=200;
+			$code ||= 200;
+			$content = '' unless defined $content;
 			utf8::encode $content if utf8::is_utf8 $content;
 			my $reply = "HTTP/$self->{version} $code $http{$code}$LF";
 			my @good;my @bad;
@@ -333,6 +334,13 @@ BEGIN {
 				}
 				$content = '';
 			}
+
+			# https://www.rfc-editor.org/rfc/rfc7230#section-3.3.2
+			if ($code == 204 or $code == 304 or $code < 200) {
+				delete $h->{'content-length'};
+				$content = '';
+			}
+
 			if (exists $h->{'content-type'}) {
 				if( $h->{'content-type'} !~ m{[^;]+;\s*charset\s*=}
 				and $h->{'content-type'} =~ m{(?:^(?:text/|application/(?:json|(?:x-)?javascript))|\+(?:json|xml)\b)}i) {

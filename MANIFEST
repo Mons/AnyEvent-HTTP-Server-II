@@ -21,8 +21,10 @@ MANIFEST.SKIP
 README
 README.md
 t/00-load.t
-t/01-basic.t
-t/02-sendfile.t
+t/01-basic-ae.t
+t/02-basic-ev.t
+t/03-sendfile.t
+t/basic.pl
 t/pod.t
 t/testlib.pm
 test.sh

@@ -22,5 +22,5 @@ requires:
   Digest::SHA1: '2'
   HTTP::Easy: '0.02'
   JSON::XS: '3'
-version: '1.99995'
+version: '1.99996'
 x_serialization_backend: 'CPAN::Meta::YAML version 0.018'

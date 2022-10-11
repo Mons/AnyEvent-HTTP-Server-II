@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 
-use Test::More tests => 194;
+use Test::More tests => 224;
 use Data::Dumper;
 use FindBin;
 use lib "$FindBin::Bin/..";
@@ -253,6 +253,42 @@ test_server_close {
 	return;
 }	'connection close',
 	[["GET /test1 HTTP/1.1\nHost:localhost\nConnection:close\n\n"],                          500, {}, "Request not handled\nGET /test1\n" ],
+if ALL;
+
+test_server {
+	return 204, undef, headers => {};
+}	'204 - no cl - undef',
+	[["GET /test1 HTTP/1.1\nHost:localhost\nConnection:keep-alive\n\n"], 204, { 'content-length' => undef }, "" ],
+if ALL;
+
+test_server {
+	return 204, "", headers => {};
+}	'204 - no cl - empty',
+	[["GET /test1 HTTP/1.1\nHost:localhost\nConnection:keep-alive\n\n"], 204, { 'content-length' => undef }, "" ],
+if ALL;
+
+test_server {
+	my $s = shift;
+	my $r = shift;
+	return 204, "some content", headers => {};
+}	'204 - with content',
+	[["GET /test1 HTTP/1.1\nHost:localhost\nConnection:keep-alive\n\n"], 204, { 'content-length' => undef }, "" ],
+if ALL;
+
+test_server {
+	my $s = shift;
+	my $r = shift;
+	return 204, "", headers => {'content-length' => 0};
+}	'204 - with header',
+	[["GET /test1 HTTP/1.1\nHost:localhost\nConnection:keep-alive\n\n"], 204, { 'content-length' => undef }, "" ],
+if ALL;
+
+test_server {
+	my $s = shift;
+	my $r = shift;
+	return 200, undef;
+}	'200 - with undef body',
+	[["GET /test1 HTTP/1.1\nHost:localhost\nConnection:keep-alive\n\n"], 200, { 'content-length' => 0 }, "" ],
 if ALL;
 
 }
