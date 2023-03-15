@@ -375,6 +375,7 @@ BEGIN {
 									push @c, "path=" . $p;
 									push @c, "Secure"  if $o->{secure};
 									push @c, "HttpOnly"  if $o->{httponly};
+									push @c, "SameSite=" . $o->{samesite} if $o->{samesite};
 									push @bad, "\u\Lset-cookie\E: ". join('; ',@c) .$LF;
 								}
 							}
