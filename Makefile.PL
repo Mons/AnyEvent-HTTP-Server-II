@@ -9,7 +9,7 @@ WriteMakefile(
 		AnyEvent       => 5,
 		'Digest::SHA1' => 2,
 		'JSON::XS'     => 3,
-		'HTTP::Easy'   => 0.02,
+		'HTTP::Easy'   => 0.04,
 	},
 	ABSTRACT_FROM     => 'lib/AnyEvent/HTTP/Server.pm', # retrieve abstract from module
 	AUTHOR            => 'Mons Anderson <mons@cpan.org>',
