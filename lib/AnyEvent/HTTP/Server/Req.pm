@@ -273,10 +273,15 @@ BEGIN {
 				$h->{'content-type'} = 'application/octet-stream';
 			}
 			for (keys %$h) {
-				if (exists $hdr{lc $_}) { $good[ $hdri{lc $_} ] = $hdr{ lc $_ }.": ".$h->{$_}.$LF; }
-				else { push @bad, "\u\L$_\E: ".$h->{$_}.$LF; }
+				if (exists $hdr{lc $_}) { $good[ $hdri{lc $_} ] = $hdr{ lc $_ }.": ".$h->{$_}; }
+				else { push @bad, "\u\L$_\E: ".$h->{$_}; }
 			}
-			defined() and $reply .= $_ for @good,@bad;
+			for (@good,@bad) {
+				if (defined()) {
+					s/[\r\n]+/ /g;
+					$reply .= $_ . $LF;
+				}
+			}
 			$reply .= $LF;
 			if( $self->{writer} ) {
 				$self->{writer}->( \$reply );
@@ -360,7 +365,7 @@ BEGIN {
 			}
 
 			for (keys %$h) {
-				if (exists $hdr{lc $_}) { $good[ $hdri{lc $_} ] = $hdr{ lc $_ }.": ".$h->{$_}.$LF; }
+				if (exists $hdr{lc $_}) { $good[ $hdri{lc $_} ] = $hdr{ lc $_ }.": ".$h->{$_}; }
 				else {
 					if (lc $_ eq 'set-cookie' ) {
 						my $cookies = HTTP::Easy::Cookies->decode($h->{$_});
@@ -376,16 +381,21 @@ BEGIN {
 									push @c, "Secure"  if $o->{secure};
 									push @c, "HttpOnly"  if $o->{httponly};
 									push @c, "SameSite=" . $o->{samesite} if $o->{samesite};
-									push @bad, "\u\Lset-cookie\E: ". join('; ',@c) .$LF;
+									push @bad, "\u\Lset-cookie\E: ". join('; ',@c);
 								}
 							}
 						}
 					} else {
-						push @bad, "\u\L$_\E: ".$h->{$_}.$LF;
+						push @bad, "\u\L$_\E: ".$h->{$_};
 					}
 				}
 			}
-			defined() and $reply .= $_ for @good,@bad;
+			for (@good,@bad) {
+				if (defined()) {
+					s/[\r\n]+/ /g;
+					$reply .= $_ . $LF;
+				}
+			}
 			# 2 is size of LF
 			$self->attrs->{head_size} = length($reply) + 2;
 			$self->attrs->{body_size} = length $content;

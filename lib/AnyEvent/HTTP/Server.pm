@@ -8,7 +8,7 @@ AnyEvent::HTTP::Server - AnyEvent HTTP/1.1 Server
 
 our $VERSION;
 BEGIN{
-$VERSION = '1.99997';
+$VERSION = '1.99998';
 }
 
 use AnyEvent::HTTP::Server::Kit;
